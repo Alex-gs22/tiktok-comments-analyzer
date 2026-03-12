@@ -20,6 +20,11 @@ export default function Classifier() {
     intensidad: number;
   } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [globalStats, setGlobalStats] = useState({
+    labeled: 0,
+    pending: 0,
+    loading: true,
+  });
 
   // IDs ya clasificados en esta sesión para evitar repetir
   const classified = useRef(new Set<number>());
@@ -39,6 +44,29 @@ export default function Classifier() {
     });
   }, []);
 
+  const refreshStats = useCallback(async () => {
+    try {
+      const [{ count: labeled }, { count: pending }] = await Promise.all([
+        supabase
+          .from("corpus_training")
+          .select("id", { count: "exact", head: true })
+          .not("id_emocion", "is", null),
+        supabase
+          .from("corpus_training")
+          .select("id", { count: "exact", head: true })
+          .is("id_emocion", null),
+      ]);
+
+      setGlobalStats({
+        labeled: labeled ?? 0,
+        pending: pending ?? 0,
+        loading: false,
+      });
+    } catch {
+      setGlobalStats((prev) => ({ ...prev, loading: false }));
+    }
+  }, []);
+
   // --- Carga inicial: emociones + primer comentario ---
   useEffect(() => {
     async function init() {
@@ -53,7 +81,7 @@ export default function Classifier() {
         if (emoErr) throw emoErr;
         setEmociones(emos ?? []);
 
-        await fetchNext();
+        await Promise.all([fetchNext(), refreshStats()]);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Error al cargar datos");
       } finally {
@@ -63,6 +91,15 @@ export default function Classifier() {
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Refresco periodico de stats globales
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      refreshStats();
+    }, 12000);
+
+    return () => window.clearInterval(intervalId);
+  }, [refreshStats]);
 
   // --- Traer un comentario aleatorio pendiente via RPC ---
   const fetchNext = useCallback(async () => {
@@ -173,8 +210,9 @@ export default function Classifier() {
       setDone(true);
     } finally {
       setLoading(false);
+      refreshStats();
     }
-  }, [fetchNext]);
+  }, [fetchNext, refreshStats]);
 
   // --- Omitir ---
   const skip = useCallback(() => {
@@ -353,6 +391,17 @@ export default function Classifier() {
       {!disabled && (
         <div className="hint">Selecciona emoción + intensidad en un click</div>
       )}
+
+      <div className="global-stats" aria-live="polite">
+        {globalStats.loading ? (
+          <span>Actualizando conteo...</span>
+        ) : (
+          <>
+            <span>Total de etiquetados: {globalStats.labeled}</span>
+            <span>Pendientes por etiquetar: {globalStats.pending}</span>
+          </>
+        )}
+      </div>
     </div>
   );
 }
