@@ -1,0 +1,271 @@
+.classifier {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 0.5rem;
+}
+
+.header h1 {
+  font-size: 1.25rem;
+  margin: 0;
+  color: #1a202c;
+}
+
+.counter {
+  font-size: 0.85rem;
+  color: #718096;
+  font-family: monospace;
+}
+
+/* Comentario */
+.comment-section {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.comment-text {
+  font-size: 1.3rem;
+  line-height: 1.6;
+  margin: 0 0 0.75rem 0;
+  color: #1a202c;
+  word-break: break-word;
+}
+
+.tema-info {
+  font-size: 0.85rem;
+  color: #4a5568;
+}
+
+.tema-nombre {
+  font-weight: 600;
+}
+
+.tema-cat {
+  color: #718096;
+}
+
+/* Cooldown */
+.cooldown {
+  text-align: center;
+  padding: 0.5rem;
+  background: #fefcbf;
+  border: 1px solid #ecc94b;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  color: #744210;
+  font-size: 0.95rem;
+}
+
+/* Error */
+.error-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: #fed7d7;
+  border: 1px solid #fc8181;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  color: #742a2a;
+  font-size: 0.9rem;
+}
+
+.error-bar button {
+  background: #e53e3e;
+  color: white;
+  border: none;
+  padding: 0.3rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.error-bar button:hover {
+  background: #c53030;
+}
+
+/* Grilla de emociones */
+.emotions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.emotions-grid.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.emotion-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.5rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+  position: relative;
+  user-select: none;
+}
+
+.emotion-col:hover {
+  border-color: #4299e1;
+  background: #ebf8ff;
+}
+
+.emotion-col.selected {
+  border-color: #2b6cb0;
+  background: #bee3f8;
+}
+
+.emo-key {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.65rem;
+  color: #a0aec0;
+  font-family: monospace;
+}
+
+.emo-level {
+  font-size: 0.75rem;
+  color: #718096;
+}
+
+.emo-level.low {
+  color: #48bb78;
+}
+
+.emo-level.high {
+  color: #e53e3e;
+}
+
+.emo-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #2d3748;
+  text-align: center;
+}
+
+/* Selector de intensidad */
+.intensity-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.int-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 5px;
+  background: white;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #2d3748;
+  transition: background 0.1s;
+}
+
+.int-btn:hover {
+  background: #edf2f7;
+}
+
+.int-btn kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4em;
+  height: 1.4em;
+  background: #edf2f7;
+  border: 1px solid #cbd5e0;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #4a5568;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.5rem;
+}
+
+.skip-btn {
+  padding: 0.4rem 1rem;
+  background: #edf2f7;
+  border: 1px solid #cbd5e0;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #4a5568;
+}
+
+.skip-btn:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.skip-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: #a0aec0;
+}
+
+/* Estado genérico */
+.status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  font-size: 1.1rem;
+  color: #4a5568;
+}
+
+.status.done {
+  color: #2f855a;
+}
+
+.status h2 {
+  margin-bottom: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .emotions-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.4rem;
+  }
+
+  .comment-text {
+    font-size: 1.1rem;
+  }
+}
