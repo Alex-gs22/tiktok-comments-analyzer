@@ -12,7 +12,6 @@ export default function Classifier() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedEmocion, setSelectedEmocion] = useState<Emocion | null>(null);
   const [cooldown, setCooldown] = useState(COOLDOWN_SECONDS);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -24,8 +23,19 @@ export default function Classifier() {
 
   // IDs ya clasificados en esta sesión para evitar repetir
   const classified = useRef(new Set<number>());
-  // Último ID cargado para paginación estable
-  const lastLoadedId = useRef(0);
+
+  // Contador de sesión persistido en sessionStorage
+  const [sessionCount, setSessionCount] = useState(() => {
+    const saved = sessionStorage.getItem("emotion-labeler-count");
+    return saved ? Number(saved) : 0;
+  });
+  const incrementSession = useCallback(() => {
+    setSessionCount((prev) => {
+      const next = prev + 1;
+      sessionStorage.setItem("emotion-labeler-count", String(next));
+      return next;
+    });
+  }, []);
 
   const current = pendientes[currentIndex] ?? null;
 
@@ -54,15 +64,14 @@ export default function Classifier() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- Cargar lote de comentarios pendientes ---
+  // --- Cargar lote de comentarios pendientes (orden aleatorio) ---
   const fetchBatch = useCallback(async () => {
+    // Traer un lote grande y mezclar en cliente para orden aleatorio
     const { data: rows, error: err } = await supabase
-      .from("corpus")
+      .from("corpus_training")
       .select("*")
       .is("id_emocion", null)
-      .gt("id", lastLoadedId.current)
-      .order("id", { ascending: true })
-      .limit(BATCH_SIZE);
+      .limit(BATCH_SIZE * 5);
 
     if (err) throw err;
     if (!rows || rows.length === 0) {
@@ -70,17 +79,24 @@ export default function Classifier() {
       return;
     }
 
-    lastLoadedId.current = rows[rows.length - 1].id;
+    // Mezclar aleatoriamente (Fisher-Yates)
+    for (let i = rows.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rows[i], rows[j]] = [rows[j], rows[i]];
+    }
+
+    // Tomar solo BATCH_SIZE
+    const batch = rows.slice(0, BATCH_SIZE);
 
     // Resolver temas
     const temaIds = [
-      ...new Set(rows.map((r: Comentario) => r.id_tema).filter(Boolean)),
+      ...new Set(batch.map((r: Comentario) => r.id_tema).filter(Boolean)),
     ];
     let temasMap: Record<number, Tema> = {};
 
     if (temaIds.length > 0) {
       const { data: temas } = await supabase
-        .from("temas")
+        .from("temas_training")
         .select("*")
         .in("id", temaIds);
 
@@ -89,7 +105,7 @@ export default function Classifier() {
       }
     }
 
-    const nuevos: ComentarioPendiente[] = rows
+    const nuevos: ComentarioPendiente[] = batch
       .filter((r: Comentario) => !classified.current.has(r.id))
       .map((r: Comentario) => ({
         comentario: r,
@@ -97,7 +113,7 @@ export default function Classifier() {
       }));
 
     setPendientes((prev) => [...prev, ...nuevos]);
-    setDone(nuevos.length === 0 && rows.length < BATCH_SIZE);
+    setDone(nuevos.length === 0 && rows.length === 0);
   }, []);
 
   // --- Cooldown timer ---
@@ -110,7 +126,6 @@ export default function Classifier() {
   // Reset cooldown al cambiar de comentario
   useEffect(() => {
     setCooldown(COOLDOWN_SECONDS);
-    setSelectedEmocion(null);
   }, [currentIndex]);
 
   // --- Guardar clasificación ---
@@ -123,13 +138,14 @@ export default function Classifier() {
 
       try {
         const { error: upErr } = await supabase
-          .from("corpus")
+          .from("corpus_training")
           .update({ id_emocion: idEmocion, intensidad })
           .eq("id", current.comentario.id);
 
         if (upErr) throw upErr;
 
         classified.current.add(current.comentario.id);
+        incrementSession();
         advance();
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Error al guardar");
@@ -147,7 +163,6 @@ export default function Classifier() {
 
   // --- Avanzar al siguiente ---
   const advance = useCallback(() => {
-    setSelectedEmocion(null);
     const next = currentIndex + 1;
     if (next >= pendientes.length) {
       // Intentar cargar más
@@ -174,43 +189,10 @@ export default function Classifier() {
     }
   }, [retryData, saveClassification]);
 
-  // --- Selección de intensidad ---
-  const selectIntensidad = useCallback(
-    (nivel: number) => {
-      if (!selectedEmocion || cooldown > 0) return;
-      saveClassification(selectedEmocion.id, nivel);
-    },
-    [selectedEmocion, cooldown, saveClassification],
-  );
-
   // --- Atajos de teclado ---
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (cooldown > 0 || saving) return;
-
-      // Si hay emoción seleccionada → elegir intensidad con 1, 2, 3
-      if (selectedEmocion) {
-        if (e.key === "1" || e.key === "2" || e.key === "3") {
-          e.preventDefault();
-          selectIntensidad(Number(e.key));
-          return;
-        }
-        if (e.key === "Escape") {
-          e.preventDefault();
-          setSelectedEmocion(null);
-          return;
-        }
-      }
-
-      // Sin emoción seleccionada → números para seleccionar emoción por posición
-      if (!selectedEmocion && e.key >= "1" && e.key <= "9") {
-        const idx = Number(e.key) - 1;
-        if (idx < emociones.length) {
-          e.preventDefault();
-          setSelectedEmocion(emociones[idx]);
-          return;
-        }
-      }
 
       // Omitir con Tab
       if (e.key === "Tab") {
@@ -221,7 +203,7 @@ export default function Classifier() {
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [cooldown, saving, selectedEmocion, emociones, selectIntensidad, skip]);
+  }, [cooldown, saving, skip]);
 
   // --- Renders ---
   if (loading && pendientes.length === 0) {
@@ -249,7 +231,10 @@ export default function Classifier() {
       {/* Encabezado con progreso */}
       <header className="header">
         <h1>Etiquetador de Emociones</h1>
-        <span className="counter">#{current.comentario.id}</span>
+        <div className="header-meta">
+          <span className="session-count">Sesión: {sessionCount}</span>
+          <span className="counter">#{current.comentario.id}</span>
+        </div>
       </header>
 
       {/* Comentario */}
@@ -282,57 +267,31 @@ export default function Classifier() {
 
       {/* Grilla de emociones */}
       <section className={`emotions-grid ${disabled ? "disabled" : ""}`}>
-        {emociones.map((emo, idx) => {
-          const isSelected = selectedEmocion?.id === emo.id;
-          return (
-            <div
-              key={emo.id}
-              className={`emotion-col ${isSelected ? "selected" : ""}`}
-              onClick={() => {
-                if (disabled) return;
-                setSelectedEmocion(isSelected ? null : emo);
-              }}
-            >
-              <span className="emo-key">{idx + 1}</span>
-              <span className="emo-level low">{emo.intensidad_min}</span>
-              <span className="emo-name">{emo.nombre}</span>
-              <span className="emo-level high">{emo.intensidad_max}</span>
-
-              {/* Selector de intensidad */}
-              {isSelected && !disabled && (
-                <div className="intensity-picker">
-                  <button
-                    className="int-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      selectIntensidad(1);
-                    }}
-                  >
-                    <kbd>1</kbd> {emo.intensidad_min}
-                  </button>
-                  <button
-                    className="int-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      selectIntensidad(2);
-                    }}
-                  >
-                    <kbd>2</kbd> {emo.nombre}
-                  </button>
-                  <button
-                    className="int-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      selectIntensidad(3);
-                    }}
-                  >
-                    <kbd>3</kbd> {emo.intensidad_max}
-                  </button>
-                </div>
-              )}
+        {emociones.map((emo) => (
+          <div key={emo.id} className="emotion-col">
+            <span className="emo-name">{emo.nombre}</span>
+            <div className="intensity-buttons">
+              <button
+                className="int-btn low"
+                onClick={() => saveClassification(emo.id, 1)}
+              >
+                {emo.intensidad_min}
+              </button>
+              <button
+                className="int-btn mid"
+                onClick={() => saveClassification(emo.id, 2)}
+              >
+                {emo.nombre}
+              </button>
+              <button
+                className="int-btn high"
+                onClick={() => saveClassification(emo.id, 3)}
+              >
+                {emo.intensidad_max}
+              </button>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </section>
 
       {/* Omitir */}
@@ -340,13 +299,10 @@ export default function Classifier() {
         <button className="skip-btn" disabled={disabled} onClick={skip}>
           Omitir (Tab)
         </button>
-        {selectedEmocion && (
+        {!disabled && (
           <span className="hint">
-            Esc para cancelar · 1/2/3 para intensidad
+            Selecciona emoción + intensidad en un click
           </span>
-        )}
-        {!selectedEmocion && !disabled && (
-          <span className="hint">Click o número para elegir emoción</span>
         )}
       </footer>
     </div>
