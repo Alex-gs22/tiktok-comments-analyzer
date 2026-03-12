@@ -232,7 +232,7 @@ export default function Classifier() {
       <header className="header">
         <h1>Etiquetador de Emociones</h1>
         <div className="header-meta">
-          <span className="session-count">Sesión: {sessionCount}</span>
+          <span className="session-count">Contador: {sessionCount}</span>
           <span className="counter">#{current.comentario.id}</span>
         </div>
       </header>
