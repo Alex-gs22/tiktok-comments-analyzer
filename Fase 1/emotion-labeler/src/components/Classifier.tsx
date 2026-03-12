@@ -3,13 +3,12 @@ import { supabase } from "../supabase";
 import type { Emocion, Comentario, Tema, ComentarioPendiente } from "../types";
 import "./Classifier.css";
 
-const BATCH_SIZE = 20;
 const COOLDOWN_SECONDS = 3;
+const MAX_RETRIES = 5;
 
 export default function Classifier() {
   const [emociones, setEmociones] = useState<Emocion[]>([]);
-  const [pendientes, setPendientes] = useState<ComentarioPendiente[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [current, setCurrent] = useState<ComentarioPendiente | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(COOLDOWN_SECONDS);
@@ -20,9 +19,12 @@ export default function Classifier() {
     idEmocion: number;
     intensidad: number;
   } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // IDs ya clasificados en esta sesión para evitar repetir
   const classified = useRef(new Set<number>());
+  // Contador de intentos para evitar loops
+  const fetchAttempts = useRef(0);
 
   // Contador de sesión persistido en sessionStorage
   const [sessionCount, setSessionCount] = useState(() => {
@@ -37,9 +39,7 @@ export default function Classifier() {
     });
   }, []);
 
-  const current = pendientes[currentIndex] ?? null;
-
-  // --- Carga inicial: emociones + primer lote ---
+  // --- Carga inicial: emociones + primer comentario ---
   useEffect(() => {
     async function init() {
       setLoading(true);
@@ -53,7 +53,7 @@ export default function Classifier() {
         if (emoErr) throw emoErr;
         setEmociones(emos ?? []);
 
-        await fetchBatch();
+        await fetchNext();
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Error al cargar datos");
       } finally {
@@ -64,56 +64,55 @@ export default function Classifier() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- Cargar lote de comentarios pendientes (orden aleatorio) ---
-  const fetchBatch = useCallback(async () => {
-    // Traer un lote grande y mezclar en cliente para orden aleatorio
-    const { data: rows, error: err } = await supabase
-      .from("corpus_training")
-      .select("*")
-      .is("id_emocion", null)
-      .limit(BATCH_SIZE * 5);
+  // --- Traer un comentario aleatorio pendiente via RPC ---
+  const fetchNext = useCallback(async () => {
+    fetchAttempts.current = 0;
 
-    if (err) throw err;
-    if (!rows || rows.length === 0) {
-      setDone(true);
+    while (fetchAttempts.current < MAX_RETRIES) {
+      // Usar RPC con random() del servidor
+      const { data: rows, error: err } = await supabase.rpc(
+        "get_random_pending",
+        { cantidad: 3 },
+      );
+
+      if (err) throw err;
+      if (!rows || rows.length === 0) {
+        setDone(true);
+        setCurrent(null);
+        return;
+      }
+
+      // Buscar uno que no hayamos visto en esta sesión
+      const fresh = (rows as Comentario[]).find(
+        (r) => !classified.current.has(r.id),
+      );
+
+      if (!fresh) {
+        // Todos los devueltos ya los vimos, reintentar
+        fetchAttempts.current++;
+        continue;
+      }
+
+      // Resolver tema
+      let tema: Tema | null = null;
+      if (fresh.id_tema) {
+        const { data: temaData } = await supabase
+          .from("temas_training")
+          .select("*")
+          .eq("id", fresh.id_tema)
+          .single();
+        tema = temaData ?? null;
+      }
+
+      setCurrent({ comentario: fresh, tema });
+      setCooldown(COOLDOWN_SECONDS);
+      setConfirmDelete(false);
       return;
     }
 
-    // Mezclar aleatoriamente (Fisher-Yates)
-    for (let i = rows.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [rows[i], rows[j]] = [rows[j], rows[i]];
-    }
-
-    // Tomar solo BATCH_SIZE
-    const batch = rows.slice(0, BATCH_SIZE);
-
-    // Resolver temas
-    const temaIds = [
-      ...new Set(batch.map((r: Comentario) => r.id_tema).filter(Boolean)),
-    ];
-    let temasMap: Record<number, Tema> = {};
-
-    if (temaIds.length > 0) {
-      const { data: temas } = await supabase
-        .from("temas_training")
-        .select("*")
-        .in("id", temaIds);
-
-      if (temas) {
-        temasMap = Object.fromEntries(temas.map((t: Tema) => [t.id, t]));
-      }
-    }
-
-    const nuevos: ComentarioPendiente[] = batch
-      .filter((r: Comentario) => !classified.current.has(r.id))
-      .map((r: Comentario) => ({
-        comentario: r,
-        tema: r.id_tema ? (temasMap[r.id_tema] ?? null) : null,
-      }));
-
-    setPendientes((prev) => [...prev, ...nuevos]);
-    setDone(nuevos.length === 0 && rows.length === 0);
+    // Si agotamos reintentos, probablemente ya no hay pendientes nuevos
+    setDone(true);
+    setCurrent(null);
   }, []);
 
   // --- Cooldown timer ---
@@ -122,11 +121,6 @@ export default function Classifier() {
     const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => clearTimeout(timer);
   }, [cooldown, current]);
-
-  // Reset cooldown al cambiar de comentario
-  useEffect(() => {
-    setCooldown(COOLDOWN_SECONDS);
-  }, [currentIndex]);
 
   // --- Guardar clasificación ---
   const saveClassification = useCallback(
@@ -137,16 +131,25 @@ export default function Classifier() {
       setRetryData(null);
 
       try {
-        const { error: upErr } = await supabase
+        const { error: upErr, count } = await supabase
           .from("corpus_training")
           .update({ id_emocion: idEmocion, intensidad })
-          .eq("id", current.comentario.id);
+          .eq("id", current.comentario.id)
+          .is("id_emocion", null);
 
         if (upErr) throw upErr;
 
         classified.current.add(current.comentario.id);
+
+        // Si count es 0, alguien ya lo clasificó antes
+        if (count === 0) {
+          // Saltar silenciosamente al siguiente
+          await loadNext();
+          return;
+        }
+
         incrementSession();
-        advance();
+        await loadNext();
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Error al guardar");
         setRetryData({
@@ -161,26 +164,24 @@ export default function Classifier() {
     [current],
   ); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // --- Avanzar al siguiente ---
-  const advance = useCallback(() => {
-    const next = currentIndex + 1;
-    if (next >= pendientes.length) {
-      // Intentar cargar más
-      setLoading(true);
-      fetchBatch()
-        .then(() => setCurrentIndex(next))
-        .catch(() => setDone(true))
-        .finally(() => setLoading(false));
-    } else {
-      setCurrentIndex(next);
+  // --- Cargar siguiente comentario ---
+  const loadNext = useCallback(async () => {
+    setLoading(true);
+    try {
+      await fetchNext();
+    } catch {
+      setDone(true);
+    } finally {
+      setLoading(false);
     }
-  }, [currentIndex, pendientes.length, fetchBatch]);
+  }, [fetchNext]);
 
   // --- Omitir ---
   const skip = useCallback(() => {
     if (cooldown > 0) return;
-    advance();
-  }, [cooldown, advance]);
+    if (current) classified.current.add(current.comentario.id);
+    loadNext();
+  }, [cooldown, current, loadNext]);
 
   // --- Reintentar ---
   const retry = useCallback(() => {
@@ -188,6 +189,27 @@ export default function Classifier() {
       saveClassification(retryData.idEmocion, retryData.intensidad);
     }
   }, [retryData, saveClassification]);
+
+  // --- Eliminar comentario ---
+  const deleteComment = useCallback(async () => {
+    if (!current) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const { error: delErr } = await supabase
+        .from("corpus_training")
+        .delete()
+        .eq("id", current.comentario.id);
+      if (delErr) throw delErr;
+      classified.current.add(current.comentario.id);
+      setConfirmDelete(false);
+      await loadNext();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error al eliminar");
+    } finally {
+      setSaving(false);
+    }
+  }, [current, loadNext]);
 
   // --- Atajos de teclado ---
   useEffect(() => {
@@ -206,7 +228,7 @@ export default function Classifier() {
   }, [cooldown, saving, skip]);
 
   // --- Renders ---
-  if (loading && pendientes.length === 0) {
+  if (loading && !current) {
     return <div className="status">Cargando datos...</div>;
   }
 
@@ -249,6 +271,39 @@ export default function Classifier() {
           </div>
         )}
       </section>
+
+      {/* Acciones: Omitir y Eliminar */}
+      <div className="actions-bar">
+        <button
+          className="action-btn skip-btn"
+          disabled={disabled}
+          onClick={skip}
+        >
+          Omitir
+        </button>
+        {!confirmDelete ? (
+          <button
+            className="action-btn delete-btn"
+            disabled={disabled}
+            onClick={() => setConfirmDelete(true)}
+          >
+            Eliminar
+          </button>
+        ) : (
+          <span className="confirm-group">
+            <span className="confirm-label">¿Seguro?</span>
+            <button className="action-btn confirm-yes" onClick={deleteComment}>
+              Sí
+            </button>
+            <button
+              className="action-btn confirm-no"
+              onClick={() => setConfirmDelete(false)}
+            >
+              No
+            </button>
+          </span>
+        )}
+      </div>
 
       {/* Cooldown */}
       {cooldown > 0 && (
@@ -294,17 +349,10 @@ export default function Classifier() {
         ))}
       </section>
 
-      {/* Omitir */}
-      <footer className="footer">
-        <button className="skip-btn" disabled={disabled} onClick={skip}>
-          Omitir (Tab)
-        </button>
-        {!disabled && (
-          <span className="hint">
-            Selecciona emoción + intensidad en un click
-          </span>
-        )}
-      </footer>
+      {/* Hint */}
+      {!disabled && (
+        <div className="hint">Selecciona emoción + intensidad en un click</div>
+      )}
     </div>
   );
 }
