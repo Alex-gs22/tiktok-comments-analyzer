@@ -240,6 +240,7 @@ export default function Classifier() {
         .eq("id", current.comentario.id);
       if (delErr) throw delErr;
       classified.current.add(current.comentario.id);
+      incrementSession();
       setConfirmDelete(false);
       await loadNext();
     } catch (e: unknown) {
@@ -247,7 +248,7 @@ export default function Classifier() {
     } finally {
       setSaving(false);
     }
-  }, [current, loadNext]);
+  }, [current, loadNext, incrementSession]);
 
   // --- Atajos de teclado ---
   useEffect(() => {
