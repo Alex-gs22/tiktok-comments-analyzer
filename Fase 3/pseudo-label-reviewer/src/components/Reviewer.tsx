@@ -124,6 +124,7 @@ export default function Reviewer() {
     confirmados: 0,
     corregidos: 0,
     descartados: 0,
+    omitidos: 0,
   });
 
   const [sessionCount, setSessionCount] = useState(() => {
@@ -288,7 +289,7 @@ export default function Reviewer() {
 
   // --- Save review (with session ID) ---
   const saveReview = useCallback(
-    async (emocionId: number, estado: "confirmado" | "corregido" | "descartado") => {
+    async (emocionId: number, estado: "confirmado" | "corregido" | "descartado" | "omitido") => {
       if (!current) return;
       setSaving(true);
       setError(null);
@@ -336,9 +337,9 @@ export default function Reviewer() {
 
   // --- Skip ---
   const skip = useCallback(() => {
-    if (cooldown > 0) return;
-    loadNext();
-  }, [cooldown, loadNext]);
+    if (cooldown > 0 || !current) return;
+    saveReview(current.pred_emocion_id, "omitido");
+  }, [cooldown, current, saveReview]);
 
   // --- Keyboard shortcuts ---
   useEffect(() => {
@@ -380,6 +381,7 @@ export default function Reviewer() {
           <span>✅ {stats.confirmados} confirmados</span>
           <span>🔄 {stats.corregidos} corregidos</span>
           <span>🗑 {stats.descartados} descartados</span>
+          <span>⏭ {stats.omitidos} omitidos</span>
         </div>
       </div>
     );
@@ -552,6 +554,9 @@ export default function Reviewer() {
         </span>
         <span className="rv-stat">
           🗑 {stats.descartados}
+        </span>
+        <span className="rv-stat">
+          ⏭ {stats.omitidos}
         </span>
         <span className="rv-stat rv-stat-pending">
           ⏳ {stats.pendientes} pendientes

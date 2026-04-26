@@ -36,4 +36,5 @@ export interface ReviewStats {
   confirmados: number;
   corregidos: number;
   descartados: number;
+  omitidos: number;
 }
