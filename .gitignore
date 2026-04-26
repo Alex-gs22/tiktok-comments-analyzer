@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Machine Learning Models
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.pkl
+*.pb
+*.onnx
+*.ckpt
+*.tflite
+*.joblib
+*.sav
+
+# Training outputs / Checkpoints
+models/
+checkpoints/
+runs/
+*.log
+*.tfrecord
+*.tfrecords
+
+# Datasets / Large files
+*.csv
+*.tsv
+*.json
+*.jsonl
+data/
+datasets/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
