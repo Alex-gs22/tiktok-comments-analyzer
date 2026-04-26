@@ -245,27 +245,26 @@ export default function Reviewer() {
     if (!reviewerName) return;
 
     const releaseLocks = () => {
-      // Use sendBeacon for reliability on tab close
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/release_session_locks`;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const url = `${supabaseUrl}/rest/v1/rpc/release_session_locks?apikey=${supabaseKey}`;
       const body = JSON.stringify({ p_session_id: sessionId.current });
-      const headers = {
-        "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      };
 
-      // Try sendBeacon first (more reliable on unload)
-      const blob = new Blob([body], { type: "application/json" });
-      const beaconSent = navigator.sendBeacon(url, blob);
-
-      if (!beaconSent) {
-        // Fallback to fetch with keepalive
+      // Try fetch with keepalive first (supports headers, reliable on unload)
+      try {
         fetch(url, {
           method: "POST",
-          headers,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${supabaseKey}`,
+          },
           body,
           keepalive: true,
         }).catch(() => {});
+      } catch {
+        // Fallback: sendBeacon (apikey in query param since no custom headers)
+        const blob = new Blob([body], { type: "application/json" });
+        navigator.sendBeacon(url, blob);
       }
     };
 
