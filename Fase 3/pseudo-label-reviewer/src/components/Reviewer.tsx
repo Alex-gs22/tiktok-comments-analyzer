@@ -27,7 +27,88 @@ function confidenceLabel(conf: number): string {
   return "Baja";
 }
 
+/** Generate a UUID v4 (crypto-safe) */
+function uuid4(): string {
+  return crypto.randomUUID();
+}
+
+/** Get or create session ID for this tab (persists per tab via sessionStorage) */
+function getSessionId(): string {
+  const KEY = "reviewer-session-id";
+  let id = sessionStorage.getItem(KEY);
+  if (!id) {
+    id = uuid4();
+    sessionStorage.setItem(KEY, id);
+  }
+  return id;
+}
+
+/** Get or create reviewer name (persists across tabs via localStorage) */
+function getReviewerName(): string | null {
+  return localStorage.getItem("reviewer-name");
+}
+
+function setReviewerName(name: string) {
+  localStorage.setItem("reviewer-name", name.trim());
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Login Screen – Reviewer Name
+   ═══════════════════════════════════════════════════════════ */
+function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
+  const [name, setName] = useState("");
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (trimmed.length >= 2) {
+      onLogin(trimmed);
+    }
+  };
+
+  return (
+    <div className="rv-login-backdrop">
+      <form className="rv-login-card" onSubmit={submit}>
+        <div className="rv-login-icon">👤</div>
+        <h2 className="rv-login-title">Revisor de Pseudo-Labels</h2>
+        <p className="rv-login-subtitle">
+          Ingresa tu nombre para iniciar tu sesión de revisión.
+          <br />
+          Cada pestaña trabaja con comentarios exclusivos.
+        </p>
+        <input
+          className="rv-login-input"
+          type="text"
+          placeholder="Tu nombre…"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
+          minLength={2}
+          maxLength={40}
+        />
+        <button
+          className="rv-login-btn"
+          type="submit"
+          disabled={name.trim().length < 2}
+        >
+          Comenzar revisión →
+        </button>
+      </form>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Main Reviewer Component
+   ═══════════════════════════════════════════════════════════ */
 export default function Reviewer() {
+  // Auth state
+  const [reviewerName, setReviewerNameState] = useState<string | null>(
+    getReviewerName,
+  );
+  const sessionId = useRef(getSessionId());
+
+  // Data state
   const [emociones, setEmociones] = useState<EmocionFusionada[]>([]);
   const [current, setCurrent] = useState<PseudoLabel | null>(null);
   const [queue, setQueue] = useState<PseudoLabel[]>([]);
@@ -45,8 +126,6 @@ export default function Reviewer() {
     descartados: 0,
   });
 
-  const reviewed = useRef(new Set<number>());
-
   const [sessionCount, setSessionCount] = useState(() => {
     const saved = sessionStorage.getItem("reviewer-session-count");
     return saved ? Number(saved) : 0;
@@ -58,6 +137,12 @@ export default function Reviewer() {
       sessionStorage.setItem("reviewer-session-count", String(next));
       return next;
     });
+  }, []);
+
+  // --- Handle login ---
+  const handleLogin = useCallback((name: string) => {
+    setReviewerName(name);
+    setReviewerNameState(name);
   }, []);
 
   // --- Refresh stats ---
@@ -74,17 +159,15 @@ export default function Reviewer() {
     }
   }, []);
 
-  // --- Fetch batch ---
+  // --- Fetch batch (with session locking) ---
   const fetchBatch = useCallback(async (): Promise<PseudoLabel[]> => {
     const { data, error: err } = await supabase.rpc("get_next_review", {
+      p_session_id: sessionId.current,
       cantidad: BATCH_SIZE,
     });
     if (err) throw err;
     if (!data || (data as PseudoLabel[]).length === 0) return [];
-
-    return (data as PseudoLabel[]).filter(
-      (r) => !reviewed.current.has(r.id),
-    );
+    return data as PseudoLabel[];
   }, []);
 
   // --- Load next from queue or fetch ---
@@ -122,6 +205,8 @@ export default function Reviewer() {
 
   // --- Init ---
   useEffect(() => {
+    if (!reviewerName) return;
+
     async function init() {
       setLoading(true);
       try {
@@ -153,13 +238,47 @@ export default function Reviewer() {
     }
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reviewerName]);
+
+  // --- Release locks on tab close ---
+  useEffect(() => {
+    if (!reviewerName) return;
+
+    const releaseLocks = () => {
+      // Use sendBeacon for reliability on tab close
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/release_session_locks`;
+      const body = JSON.stringify({ p_session_id: sessionId.current });
+      const headers = {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      };
+
+      // Try sendBeacon first (more reliable on unload)
+      const blob = new Blob([body], { type: "application/json" });
+      const beaconSent = navigator.sendBeacon(url, blob);
+
+      if (!beaconSent) {
+        // Fallback to fetch with keepalive
+        fetch(url, {
+          method: "POST",
+          headers,
+          body,
+          keepalive: true,
+        }).catch(() => {});
+      }
+    };
+
+    window.addEventListener("beforeunload", releaseLocks);
+    return () => window.removeEventListener("beforeunload", releaseLocks);
+  }, [reviewerName]);
 
   // --- Stats refresh interval ---
   useEffect(() => {
+    if (!reviewerName) return;
     const id = window.setInterval(refreshStats, 15000);
     return () => window.clearInterval(id);
-  }, [refreshStats]);
+  }, [refreshStats, reviewerName]);
 
   // --- Cooldown timer ---
   useEffect(() => {
@@ -168,7 +287,7 @@ export default function Reviewer() {
     return () => clearTimeout(timer);
   }, [cooldown, current]);
 
-  // --- Save review ---
+  // --- Save review (with session ID) ---
   const saveReview = useCallback(
     async (emocionId: number, estado: "confirmado" | "corregido" | "descartado") => {
       if (!current) return;
@@ -178,13 +297,13 @@ export default function Reviewer() {
       try {
         const { error: rpcErr } = await supabase.rpc("save_review", {
           p_id: current.id,
+          p_session_id: sessionId.current,
           p_emocion_id: emocionId,
           p_estado: estado,
         });
 
         if (rpcErr) throw rpcErr;
 
-        reviewed.current.add(current.id);
         incrementSession();
         await loadNext();
       } catch (e: unknown) {
@@ -219,9 +338,8 @@ export default function Reviewer() {
   // --- Skip ---
   const skip = useCallback(() => {
     if (cooldown > 0) return;
-    if (current) reviewed.current.add(current.id);
     loadNext();
-  }, [cooldown, current, loadNext]);
+  }, [cooldown, loadNext]);
 
   // --- Keyboard shortcuts ---
   useEffect(() => {
@@ -243,6 +361,11 @@ export default function Reviewer() {
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [cooldown, saving, confirm, skip, showCorrect]);
+
+  // --- Login screen ---
+  if (!reviewerName) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
 
   // --- Renders ---
   if (loading && !current) {
@@ -277,6 +400,9 @@ export default function Reviewer() {
       <header className="rv-header">
         <h1>Revisor de Pseudo-Labels</h1>
         <div className="rv-header-meta">
+          <span className="rv-reviewer-name" title={`Sesión: ${sessionId.current.slice(0, 8)}…`}>
+            👤 {reviewerName}
+          </span>
           <span className="rv-session">Sesión: {sessionCount}</span>
           <span className="rv-id">#{current.id}</span>
         </div>

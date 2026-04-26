@@ -21,6 +21,8 @@ export interface PseudoLabel {
   revision_emocion_nombre: string | null;
   revision_estado: string;
   revisado_en: string | null;
+  locked_by: string | null;
+  locked_at: string | null;
 }
 
 export interface EmocionFusionada {
