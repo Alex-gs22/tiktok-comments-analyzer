@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detector de Emociones — TikTok Comments Analyzer</title>
+    <meta name="description" content="Analiza las emociones en comentarios de TikTok usando IA. Modelo RoBERTuito fine-tuneado con 6 emociones.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Animated background -->
+        <div class="bg-grid"></div>
+        <div class="bg-glow bg-glow--1"></div>
+        <div class="bg-glow bg-glow--2"></div>
+
+        <!-- Header -->
+        <header class="header">
+            <div class="header__badge">🎭 AI Emotion Detector</div>
+            <h1 class="header__title">
+                ¿Qué emoción expresa<br>
+                <span class="header__gradient">tu comentario?</span>
+            </h1>
+            <p class="header__sub">
+                Modelo <strong>RoBERTuito</strong> fine-tuneado para clasificar emociones en comentarios de TikTok en español.
+                <a href="https://huggingface.co/FalexOne/robertuito-emociones-tiktok" target="_blank" class="header__link">Ver en 🤗 Hugging Face</a>
+            </p>
+        </header>
+
+        <!-- Input Section -->
+        <main class="main">
+            <div class="input-card">
+                <div class="input-card__header">
+                    <span class="input-card__icon">💬</span>
+                    <span>Escribe un comentario</span>
+                </div>
+                <textarea
+                    id="comment-input"
+                    class="input-card__textarea"
+                    placeholder="Ej: Que bonito video, me encantó! 😍"
+                    maxlength="500"
+                    rows="3"
+                ></textarea>
+                <div class="input-card__footer">
+                    <span class="input-card__count"><span id="char-count">0</span>/500</span>
+                    <button id="analyze-btn" class="btn btn--primary" disabled>
+                        <span class="btn__text">Analizar emoción</span>
+                        <span class="btn__loader"></span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Example chips -->
+            <div class="examples">
+                <span class="examples__label">Prueba con:</span>
+                <div class="examples__chips">
+                    <button class="chip" data-text="Que bonito video, me encantó! 😍">😍 Alegría</button>
+                    <button class="chip" data-text="Eres el mejor creador de contenido, siempre confío en tus recomendaciones">🤝 Confianza</button>
+                    <button class="chip" data-text="Me da miedo que esto pueda pasar en mi ciudad 😰">😰 Miedo</button>
+                    <button class="chip" data-text="No puedo creer lo que acabo de ver, no me lo esperaba!!">😲 Expectación</button>
+                    <button class="chip" data-text="Esto me pone muy triste, ojalá todo mejore pronto 😢">😢 Tristeza</button>
+                    <button class="chip" data-text="Que asco de contenido, esto da mucho coraje 😤">😤 Rechazo</button>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="results" class="results" hidden>
+                <div class="results__header">
+                    <h2 class="results__title">Resultado del análisis</h2>
+                    <div class="results__prediction" id="prediction-badge"></div>
+                </div>
+                <div class="results__bars" id="results-bars"></div>
+                <div class="results__meta" id="results-meta"></div>
+            </div>
+
+            <!-- Error -->
+            <div id="error-msg" class="error-card" hidden>
+                <span class="error-card__icon">⚠️</span>
+                <p class="error-card__text" id="error-text"></p>
+                <p class="error-card__hint">El modelo puede tardar ~20s en cargar la primera vez (cold start).</p>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>
+                Modelo: <a href="https://huggingface.co/FalexOne/robertuito-emociones-tiktok" target="_blank">FalexOne/robertuito-emociones-tiktok</a>
+                · Base: <a href="https://huggingface.co/pysentimiento/robertuito-base-uncased" target="_blank">RoBERTuito</a>
+                · Macro F1: <strong>0.628</strong>
+            </p>
+            <p class="footer__copy">TikTok Comments Analyzer — Fase 4</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
