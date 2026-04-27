@@ -1,11 +1,10 @@
 /* ═══════════════════════════════════════════════════════
    Emotion Detector — Script
-   Uses Transformers.js (runs model in browser, no API)
+   Uses Gradio API from HF Spaces (free, CORS enabled)
    ═══════════════════════════════════════════════════════ */
 
-import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.6.0";
-
-const HF_MODEL = "FalexOne/robertuito-emociones-tiktok";
+const SPACE_URL = "https://falexone-tiktok-emotion-detector.hf.space";
+const GRADIO_API = `${SPACE_URL}/api/predict`;
 
 const EMOTION_META = {
   "Alegría":      { emoji: "😊", color: "#facc15" },
@@ -27,44 +26,44 @@ const predictionBadge = document.getElementById("prediction-badge");
 const resultsMeta = document.getElementById("results-meta");
 const errorEl = document.getElementById("error-msg");
 const errorText = document.getElementById("error-text");
-const errorHint = document.querySelector(".error-card__hint");
 const chips = document.querySelectorAll(".chip");
 const statusEl = document.getElementById("model-status");
 
 // ─── State ────────────────────────────────────────────────
 
 let isLoading = false;
-let classifier = null;
-let modelReady = false;
 
-// ─── Load Model on Page Load ──────────────────────────────
+// ─── Check Space Status ───────────────────────────────────
 
-async function loadModel() {
-  statusEl.textContent = "⏳ Cargando modelo (~30s la primera vez)...";
+async function checkSpace() {
+  statusEl.textContent = "⏳ Conectando con el modelo...";
   statusEl.className = "model-status model-status--loading";
 
   try {
-    classifier = await pipeline("text-classification", HF_MODEL, {
-      dtype: "fp32",
-      device: "wasm",
+    const resp = await fetch(`${SPACE_URL}/api/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: ["test"] }),
     });
-    modelReady = true;
-    statusEl.textContent = "✅ Modelo listo — ejecutándose en tu navegador";
-    statusEl.className = "model-status model-status--ready";
-  } catch (err) {
-    console.error("Error loading model:", err);
-    statusEl.textContent = "❌ Error al cargar el modelo";
-    statusEl.className = "model-status model-status--error";
+    if (resp.ok) {
+      statusEl.textContent = "✅ Modelo conectado — listo para analizar";
+      statusEl.className = "model-status model-status--ready";
+    } else {
+      statusEl.textContent = "⏳ Modelo iniciando (~1 min la primera vez)...";
+    }
+  } catch {
+    statusEl.textContent = "⏳ Modelo iniciando — intenta en 1 minuto...";
+    statusEl.className = "model-status model-status--loading";
   }
 }
 
-loadModel();
+checkSpace();
 
 // ─── Event Listeners ──────────────────────────────────────
 
 textarea.addEventListener("input", () => {
   charCount.textContent = textarea.value.length;
-  analyzeBtn.disabled = textarea.value.trim().length === 0 || !modelReady;
+  analyzeBtn.disabled = textarea.value.trim().length === 0;
 });
 
 textarea.addEventListener("keydown", (e) => {
@@ -80,7 +79,6 @@ analyzeBtn.addEventListener("click", () => {
 
 chips.forEach((chip) => {
   chip.addEventListener("click", () => {
-    if (!modelReady) return;
     const text = chip.dataset.text;
     textarea.value = text;
     charCount.textContent = text.length;
@@ -90,22 +88,65 @@ chips.forEach((chip) => {
   });
 });
 
+// ─── API Call ─────────────────────────────────────────────
+
+async function queryGradio(text) {
+  const response = await fetch(GRADIO_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: [text] }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 503 || response.status === 502) {
+      throw new Error("El modelo se está iniciando. Espera ~1 minuto e intenta de nuevo.");
+    }
+    throw new Error(`Error del servidor: ${response.status}`);
+  }
+
+  const result = await response.json();
+  // Gradio returns { data: [{ label: score, ... }] } for gr.Label
+  return result.data[0];
+}
+
 // ─── Main Analyze Function ────────────────────────────────
 
 async function analyzeEmotion() {
   const text = textarea.value.trim();
-  if (!text || !modelReady) return;
+  if (!text) return;
 
   setLoading(true);
   hideError();
   hideResults();
 
   try {
-    const results = await classifier(text, { top_k: 6 });
+    const labelScores = await queryGradio(text);
 
-    // results is an array of {label, score}
-    const predictions = Array.isArray(results[0]) ? results[0] : results;
+    // Convert {label: score} to [{label, score}] format
+    const predictions = Object.entries(labelScores.confidences || labelScores)
+      .map(([label, score]) => {
+        // Handle both Gradio formats: confidences array or label dict
+        if (typeof score === "object") {
+          return { label: score.label, score: score.confidence };
+        }
+        return { label: label.replace(/^[^\w]+ /, ""), score };
+      });
+
+    // If Gradio returned confidences array directly
+    if (labelScores.confidences) {
+      predictions.length = 0;
+      for (const c of labelScores.confidences) {
+        predictions.push({
+          label: c.label.replace(/^[^\w]+ /, ""), // remove emoji prefix
+          score: c.confidence,
+        });
+      }
+    }
+
     predictions.sort((a, b) => b.score - a.score);
+
+    statusEl.textContent = "✅ Modelo conectado — listo para analizar";
+    statusEl.className = "model-status model-status--ready";
 
     showResults(predictions, text);
   } catch (err) {
@@ -129,13 +170,11 @@ function showResults(predictions, text) {
   const top = predictions[0];
   const meta = EMOTION_META[top.label] || { emoji: "❓", color: "#888" };
 
-  // Prediction badge
   predictionBadge.textContent = `${meta.emoji} ${top.label}`;
   predictionBadge.style.background = `${meta.color}20`;
   predictionBadge.style.color = meta.color;
   predictionBadge.style.border = `1px solid ${meta.color}40`;
 
-  // Bars
   predictions.forEach((pred, i) => {
     const info = EMOTION_META[pred.label] || { emoji: "❓", color: "#888" };
     const pct = (pred.score * 100).toFixed(1);
@@ -164,7 +203,7 @@ function showResults(predictions, text) {
   const confidence = top.score >= 0.6 ? "Alta" : top.score >= 0.4 ? "Media" : "Baja";
   resultsMeta.innerHTML = `
     <span>Confianza: <strong>${confidence}</strong> (${(top.score * 100).toFixed(1)}%)</span>
-    <span>${text.length} caracteres · Inferencia local</span>
+    <span>${text.length} caracteres analizados</span>
   `;
 
   resultsEl.hidden = false;
@@ -177,7 +216,6 @@ function hideResults() {
 
 function showError(message) {
   errorText.textContent = message;
-  errorHint.textContent = "El modelo se ejecuta localmente en tu navegador. Intenta recargar la página.";
   errorEl.hidden = false;
 }
 
