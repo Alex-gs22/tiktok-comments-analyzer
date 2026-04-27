@@ -71,7 +71,10 @@ async function queryHuggingFace(text) {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${HF_TOKEN}`,
     },
-    body: JSON.stringify({ inputs: text }),
+    body: JSON.stringify({
+      inputs: text,
+      options: { wait_for_model: true },
+    }),
   });
 
   if (response.status === 503) {
