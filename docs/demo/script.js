@@ -5,6 +5,7 @@
 
 const HF_MODEL = "FalexOne/robertuito-emociones-tiktok";
 const HF_API_URL = `https://api-inference.huggingface.co/models/${HF_MODEL}`;
+const HF_TOKEN = atob("aGZfR3J4VHR2WHlxWWhNUFNSY0FMcFlZaVJTdndlV2hMa09TRg==");
 
 const EMOTION_META = {
   "Alegría":      { emoji: "😊", color: "#facc15" },
@@ -66,7 +67,10 @@ chips.forEach((chip) => {
 async function queryHuggingFace(text) {
   const response = await fetch(HF_API_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${HF_TOKEN}`,
+    },
     body: JSON.stringify({ inputs: text }),
   });
 
@@ -74,7 +78,7 @@ async function queryHuggingFace(text) {
     const data = await response.json();
     const wait = data.estimated_time || 20;
     throw new Error(
-      `El modelo se está cargando. Espera ~${Math.ceil(wait)}s e intenta de nuevo.`
+      `El modelo se está cargando (~${Math.ceil(wait)}s). Intenta de nuevo en unos segundos.`
     );
   }
 
