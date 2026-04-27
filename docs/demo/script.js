@@ -6,6 +6,8 @@
 const SPACE = "https://falexone-tiktok-emotion-detector.hf.space";
 const API_SUBMIT = SPACE + "/gradio_api/call/predict";
 
+const NEUTRAL_THRESHOLD = 0.40;
+
 const EMOTION_META = {
   "Alegría":     { emoji: "😊", color: "#facc15" },
   "Confianza":   { emoji: "🤝", color: "#34d399" },
@@ -13,6 +15,7 @@ const EMOTION_META = {
   "Expectación": { emoji: "😲", color: "#38bdf8" },
   "Tristeza":    { emoji: "😢", color: "#60a5fa" },
   "Rechazo":     { emoji: "😤", color: "#f87171" },
+  "Incierto":    { emoji: "🤷", color: "#a1a1aa" },
 };
 
 /* ─── DOM ─────────────────────────────────────────────── */
@@ -28,6 +31,7 @@ const metaEl     = $("results-meta");
 const errorEl    = $("error-msg");
 const errorText  = $("error-text");
 const statusEl   = $("model-status");
+const placeholder = $("results-placeholder");
 const chips      = document.querySelectorAll(".chip");
 
 let busy = false;
@@ -118,6 +122,7 @@ async function run() {
   analyzeBtn.classList.add("btn--loading");
   errorEl.hidden = true;
   resultsEl.hidden = true;
+  if (placeholder) placeholder.hidden = true;
 
   try {
     const result = await classify(text);
@@ -146,9 +151,11 @@ function render(result, text) {
     .sort((a, b) => b.score - a.score);
 
   const top  = preds[0];
-  const meta = EMOTION_META[top.label] || { emoji: "❓", color: "#888" };
+  const isUncertain = top.score < NEUTRAL_THRESHOLD;
+  const displayLabel = isUncertain ? "Incierto" : top.label;
+  const meta = EMOTION_META[displayLabel] || { emoji: "❓", color: "#888" };
 
-  badge.textContent = meta.emoji + " " + top.label;
+  badge.textContent = meta.emoji + " " + displayLabel;
   badge.style.cssText =
     "background:" + meta.color + "20;color:" + meta.color +
     ";border:1px solid " + meta.color + "40";

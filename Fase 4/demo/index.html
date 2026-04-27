@@ -30,62 +30,76 @@
             </p>
         </header>
 
-        <!-- Input Section -->
+        <!-- Main: two-column on desktop -->
         <main class="main">
-            <!-- Model loading status -->
+            <!-- Model status -->
             <div id="model-status" class="model-status model-status--loading">
-                ⏳ Cargando modelo en tu navegador...
+                ⏳ Conectando con el modelo...
             </div>
 
-            <div class="input-card">
-                <div class="input-card__header">
-                    <span class="input-card__icon">💬</span>
-                    <span>Escribe un comentario</span>
-                </div>
-                <textarea
-                    id="comment-input"
-                    class="input-card__textarea"
-                    placeholder="Ej: Que bonito video, me encantó! 😍"
-                    maxlength="500"
-                    rows="3"
-                ></textarea>
-                <div class="input-card__footer">
-                    <span class="input-card__count"><span id="char-count">0</span>/500</span>
-                    <button id="analyze-btn" class="btn btn--primary" disabled>
-                        <span class="btn__text">Analizar emoción</span>
-                        <span class="btn__loader"></span>
-                    </button>
-                </div>
-            </div>
+            <div class="layout">
+                <!-- Left: input -->
+                <div class="layout__input">
+                    <div class="input-card">
+                        <div class="input-card__header">
+                            <span class="input-card__icon">💬</span>
+                            <span>Escribe un comentario</span>
+                        </div>
+                        <textarea
+                            id="comment-input"
+                            class="input-card__textarea"
+                            placeholder="Ej: Que bonito video, me encantó! 😍"
+                            maxlength="500"
+                            rows="3"
+                        ></textarea>
+                        <div class="input-card__footer">
+                            <span class="input-card__count"><span id="char-count">0</span>/500</span>
+                            <button id="analyze-btn" class="btn btn--primary" disabled>
+                                <span class="btn__text">Analizar emoción</span>
+                                <span class="btn__loader"></span>
+                            </button>
+                        </div>
+                    </div>
 
-            <!-- Example chips -->
-            <div class="examples">
-                <span class="examples__label">Prueba con:</span>
-                <div class="examples__chips">
-                    <button class="chip" data-text="Que bonito video, me encantó! 😍">😍 Alegría</button>
-                    <button class="chip" data-text="Eres el mejor creador de contenido, siempre confío en tus recomendaciones">🤝 Confianza</button>
-                    <button class="chip" data-text="Me da miedo que esto pueda pasar en mi ciudad 😰">😰 Miedo</button>
-                    <button class="chip" data-text="No puedo creer lo que acabo de ver, no me lo esperaba!!">😲 Expectación</button>
-                    <button class="chip" data-text="Esto me pone muy triste, ojalá todo mejore pronto 😢">😢 Tristeza</button>
-                    <button class="chip" data-text="Que asco de contenido, esto da mucho coraje 😤">😤 Rechazo</button>
+                    <!-- Example chips -->
+                    <div class="examples">
+                        <span class="examples__label">Prueba con:</span>
+                        <div class="examples__chips">
+                            <button class="chip" data-text="Que bonito video, me encantó! 😍">😍 Alegría</button>
+                            <button class="chip" data-text="Eres el mejor creador de contenido, siempre confío en tus recomendaciones">🤝 Confianza</button>
+                            <button class="chip" data-text="Me da miedo que esto pueda pasar en mi ciudad 😰">😰 Miedo</button>
+                            <button class="chip" data-text="No puedo creer lo que acabo de ver, no me lo esperaba!!">😲 Expectación</button>
+                            <button class="chip" data-text="Esto me pone muy triste, ojalá todo mejore pronto 😢">😢 Tristeza</button>
+                            <button class="chip" data-text="Que asco de contenido, esto da mucho coraje 😤">😤 Rechazo</button>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Results -->
-            <div id="results" class="results" hidden>
-                <div class="results__header">
-                    <h2 class="results__title">Resultado del análisis</h2>
-                    <div class="results__prediction" id="prediction-badge"></div>
+                <!-- Right: results -->
+                <div class="layout__results">
+                    <!-- Placeholder before results -->
+                    <div id="results-placeholder" class="results-placeholder">
+                        <div class="results-placeholder__icon">🎯</div>
+                        <p>Escribe un comentario y presiona <strong>Analizar</strong> para ver la emoción detectada</p>
+                    </div>
+
+                    <!-- Results -->
+                    <div id="results" class="results" hidden>
+                        <div class="results__header">
+                            <h2 class="results__title">Resultado del análisis</h2>
+                            <div class="results__prediction" id="prediction-badge"></div>
+                        </div>
+                        <div class="results__bars" id="results-bars"></div>
+                        <div class="results__meta" id="results-meta"></div>
+                    </div>
+
+                    <!-- Error -->
+                    <div id="error-msg" class="error-card" hidden>
+                        <span class="error-card__icon">⚠️</span>
+                        <p class="error-card__text" id="error-text"></p>
+                        <p class="error-card__hint">Si el Space está dormido, espera ~30s e intenta de nuevo.</p>
+                    </div>
                 </div>
-                <div class="results__bars" id="results-bars"></div>
-                <div class="results__meta" id="results-meta"></div>
-            </div>
-
-            <!-- Error -->
-            <div id="error-msg" class="error-card" hidden>
-                <span class="error-card__icon">⚠️</span>
-                <p class="error-card__text" id="error-text"></p>
-                <p class="error-card__hint">El modelo puede tardar ~20s en cargar la primera vez (cold start).</p>
             </div>
         </main>
 
