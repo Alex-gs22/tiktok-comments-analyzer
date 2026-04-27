@@ -1,11 +1,11 @@
 /* ═══════════════════════════════════════════════════════
    Emotion Detector — Script
-   Uses Hugging Face Inference API (serverless)
+   Uses Transformers.js (runs model in browser, no API)
    ═══════════════════════════════════════════════════════ */
 
+import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.6.0";
+
 const HF_MODEL = "FalexOne/robertuito-emociones-tiktok";
-const HF_API_URL = `https://api-inference.huggingface.co/models/${HF_MODEL}`;
-const HF_TOKEN = atob("aGZfR3J4VHR2WHlxWWhNUFNSY0FMcFlZaVJTdndlV2hMa09TRg==");
 
 const EMOTION_META = {
   "Alegría":      { emoji: "😊", color: "#facc15" },
@@ -27,17 +27,44 @@ const predictionBadge = document.getElementById("prediction-badge");
 const resultsMeta = document.getElementById("results-meta");
 const errorEl = document.getElementById("error-msg");
 const errorText = document.getElementById("error-text");
+const errorHint = document.querySelector(".error-card__hint");
 const chips = document.querySelectorAll(".chip");
+const statusEl = document.getElementById("model-status");
 
 // ─── State ────────────────────────────────────────────────
 
 let isLoading = false;
+let classifier = null;
+let modelReady = false;
+
+// ─── Load Model on Page Load ──────────────────────────────
+
+async function loadModel() {
+  statusEl.textContent = "⏳ Cargando modelo (~30s la primera vez)...";
+  statusEl.className = "model-status model-status--loading";
+
+  try {
+    classifier = await pipeline("text-classification", HF_MODEL, {
+      dtype: "fp32",
+      device: "wasm",
+    });
+    modelReady = true;
+    statusEl.textContent = "✅ Modelo listo — ejecutándose en tu navegador";
+    statusEl.className = "model-status model-status--ready";
+  } catch (err) {
+    console.error("Error loading model:", err);
+    statusEl.textContent = "❌ Error al cargar el modelo";
+    statusEl.className = "model-status model-status--error";
+  }
+}
+
+loadModel();
 
 // ─── Event Listeners ──────────────────────────────────────
 
 textarea.addEventListener("input", () => {
   charCount.textContent = textarea.value.length;
-  analyzeBtn.disabled = textarea.value.trim().length === 0;
+  analyzeBtn.disabled = textarea.value.trim().length === 0 || !modelReady;
 });
 
 textarea.addEventListener("keydown", (e) => {
@@ -53,6 +80,7 @@ analyzeBtn.addEventListener("click", () => {
 
 chips.forEach((chip) => {
   chip.addEventListener("click", () => {
+    if (!modelReady) return;
     const text = chip.dataset.text;
     textarea.value = text;
     charCount.textContent = text.length;
@@ -62,54 +90,21 @@ chips.forEach((chip) => {
   });
 });
 
-// ─── API Call ─────────────────────────────────────────────
-
-async function queryHuggingFace(text) {
-  const response = await fetch(HF_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${HF_TOKEN}`,
-    },
-    body: JSON.stringify({
-      inputs: text,
-      options: { wait_for_model: true },
-    }),
-  });
-
-  if (response.status === 503) {
-    const data = await response.json();
-    const wait = data.estimated_time || 20;
-    throw new Error(
-      `El modelo se está cargando (~${Math.ceil(wait)}s). Intenta de nuevo en unos segundos.`
-    );
-  }
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || `Error HTTP ${response.status}`);
-  }
-
-  return response.json();
-}
-
 // ─── Main Analyze Function ────────────────────────────────
 
 async function analyzeEmotion() {
   const text = textarea.value.trim();
-  if (!text) return;
+  if (!text || !modelReady) return;
 
   setLoading(true);
   hideError();
   hideResults();
 
   try {
-    const data = await queryHuggingFace(text);
+    const results = await classifier(text, { top_k: 6 });
 
-    // HF returns [[{label, score}, ...]] for text-classification
-    const predictions = Array.isArray(data[0]) ? data[0] : data;
-
-    // Sort by score descending
+    // results is an array of {label, score}
+    const predictions = Array.isArray(results[0]) ? results[0] : results;
     predictions.sort((a, b) => b.score - a.score);
 
     showResults(predictions, text);
@@ -159,7 +154,6 @@ function showResults(predictions, text) {
 
     resultsBars.appendChild(row);
 
-    // Animate bar width after a brief delay
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         row.querySelector(".bar-row__fill").style.width = `${pct}%`;
@@ -167,11 +161,10 @@ function showResults(predictions, text) {
     });
   });
 
-  // Meta info
   const confidence = top.score >= 0.6 ? "Alta" : top.score >= 0.4 ? "Media" : "Baja";
   resultsMeta.innerHTML = `
     <span>Confianza: <strong>${confidence}</strong> (${(top.score * 100).toFixed(1)}%)</span>
-    <span>${text.length} caracteres analizados</span>
+    <span>${text.length} caracteres · Inferencia local</span>
   `;
 
   resultsEl.hidden = false;
@@ -184,6 +177,7 @@ function hideResults() {
 
 function showError(message) {
   errorText.textContent = message;
+  errorHint.textContent = "El modelo se ejecuta localmente en tu navegador. Intenta recargar la página.";
   errorEl.hidden = false;
 }
 
