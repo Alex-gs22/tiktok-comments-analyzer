@@ -8,7 +8,6 @@ import SectionHeader from '../../src/components/SectionHeader';
 import EmotionBadge from '../../src/components/EmotionBadge';
 import TopicSelector from '../../src/components/features/TopicSelector';
 import { ComparativaSkeleton, EmptyState } from '../../src/components/StateScreens';
-import { EMOTIONS } from '../../src/lib/emotionConfig';
 import { getTopics, getTopicEmotionProfile, getConfidenceHeatmap } from '../../src/lib/dataService';
 import { Table, GitCompareArrows, X } from 'lucide-react';
 import { useDataRefresh } from '../../src/lib/useDataRefresh';
@@ -22,10 +21,10 @@ export default function ComparativaPage() {
 
   const loadInitial = useCallback(async () => {
     setLoading(true);
-    const [t, h] = await Promise.all([getTopics(), getConfidenceHeatmap()]);
-    setTopics(t);
-    setHeatmap(h);
-    const defaultSelected = t.slice(0, Math.min(3, t.length)).map((tp) => tp.nombre);
+    const [tData, hData] = await Promise.all([getTopics(), getConfidenceHeatmap()]);
+    setTopics(tData);
+    setHeatmap(hData);
+    const defaultSelected = tData.slice(0, Math.min(3, tData.length)).map((tp) => tp.nombre);
     setSelected(defaultSelected);
     setLoading(false);
   }, []);
@@ -99,7 +98,6 @@ export default function ComparativaPage() {
           <span className="text-xs text-[#4a4a5e] font-medium uppercase tracking-wider mr-1">Comparando:</span>
 
           {selected.map((name, i) => {
-            const t = topics.find((tp) => tp.nombre === name);
             const color = PROFILE_COLORS[i] || PROFILE_COLORS[0];
             return (
               <span

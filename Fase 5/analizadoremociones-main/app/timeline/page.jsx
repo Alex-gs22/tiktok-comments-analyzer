@@ -13,7 +13,7 @@ import { useDataRefresh } from '../../src/lib/useDataRefresh';
 // ── Helpers ─────────────────────────────────────────────
 
 /** Get all unique periods from data, sorted */
-function extractPeriods(data, granularity) {
+function extractPeriods(data) {
   if (!data?.length) return [];
   const periods = [...new Set(data.map((d) => d.periodo))].sort();
   return periods;

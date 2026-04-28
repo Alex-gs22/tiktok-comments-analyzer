@@ -323,9 +323,8 @@ export default function VideoPage() {
               <CommentTable comments={results.comments} />
             </div>
 
-            {/* Info */}
             <div className="text-center text-[10px] text-[#4a4a5e] space-y-1">
-              <p>Los resultados se han guardado en la base de datos bajo el tema "{topic}".</p>
+              <p>Los resultados se han guardado en la base de datos bajo el tema &quot;{topic}&quot;.</p>
             </div>
           </div>
         )}

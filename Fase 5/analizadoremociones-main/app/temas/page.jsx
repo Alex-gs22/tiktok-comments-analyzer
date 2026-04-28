@@ -28,7 +28,9 @@ export default function TemasPage() {
     const [t, g] = await Promise.all([getTopics(), getGlobalEmotionProfile()]);
     setTopics(t);
     setGlobalProfile(g);
-    if (t.length > 0 && !selectedTopic) setSelectedTopic(t[0].nombre);
+    if (t.length > 0) {
+      setSelectedTopic((prev) => prev || t[0].nombre);
+    }
     setLoading(false);
   }, []);
 

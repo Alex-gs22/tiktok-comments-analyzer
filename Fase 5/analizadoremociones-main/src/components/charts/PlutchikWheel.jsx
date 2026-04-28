@@ -59,10 +59,10 @@ export default function PlutchikWheel({ data }) {
     [data]
   );
 
-  const petalSweep = 360 / EMOTION_KEYS.length; // 60°
-
   // Build petal data
   const petals = useMemo(() => {
+    const petalSweep = 360 / EMOTION_KEYS.length; // 60°
+
     return EMOTION_KEYS.map((emotion) => {
       const config = EMOTIONS[emotion];
       const pct = data[emotion]?.porcentaje || 0;
@@ -99,7 +99,7 @@ export default function PlutchikWheel({ data }) {
           className="plutchik-svg"
         >
           <defs>
-            {petals.map(({ emotion, config, normR }) => (
+            {petals.map(({ emotion, config }) => (
               <radialGradient
                 key={`grad-${emotion}`}
                 id={`grad-${emotion}`}
@@ -148,7 +148,7 @@ export default function PlutchikWheel({ data }) {
           ))}
 
           {/* Petals */}
-          {petals.map(({ emotion, config, path, normR }) => {
+          {petals.map(({ emotion, config, path }) => {
             const isHovered = hovered === emotion;
             return (
               <g
