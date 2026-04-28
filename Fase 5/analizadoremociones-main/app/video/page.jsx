@@ -155,7 +155,7 @@ export default function VideoPage() {
           }
           
           cursor += 50; // TikWM usa el cursor estrictamente como offset
-        } catch (e) {
+        } catch {
           consecutiveEmpty++;
         }
         await new Promise(res => setTimeout(res, 400));
