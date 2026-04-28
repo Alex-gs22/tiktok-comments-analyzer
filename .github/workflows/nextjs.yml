@@ -30,20 +30,28 @@ jobs:
         uses: actions/configure-pages@v5
         
       - name: Install dependencies
-        working-directory: "Fase 5/analizadoremociones-main"
-        run: npm ci
+        run: |
+          cd "Fase 5/analizadoremociones-main"
+          npm ci
         
       - name: Build with Next.js
-        working-directory: "Fase 5/analizadoremociones-main"
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        run: npx --no-install next build
+        run: |
+          cd "Fase 5/analizadoremociones-main"
+          npm run build
+          
+      - name: Prepare artifact path
+        run: |
+          # GitHub Actions 'upload-pages-artifact' tiene bugs con espacios en la ruta.
+          # Para evitarlo, copiamos la carpeta generada (out) a la raíz del repo sin espacios.
+          cp -R "Fase 5/analizadoremociones-main/out" ./docs_out
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: "Fase 5/analizadoremociones-main/out"
+          path: ./docs_out
 
   deploy:
     environment:
