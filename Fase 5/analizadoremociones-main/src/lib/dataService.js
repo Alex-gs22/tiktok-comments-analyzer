@@ -488,6 +488,73 @@ export function getConfidenceHeatmap() {
   return cached('confidence-heatmap', _getConfidenceHeatmap);
 }
 
+// ── Insert Video & Topic ────────────────────────────────
+
+export async function getOrCreateTopic(topicName) {
+  if (!supabase) return null;
+  if (!topicName) return null;
+
+  // Check if exists
+  const { data: existing } = await supabase
+    .from('temas_produccion')
+    .select('id')
+    .eq('nombre', topicName)
+    .single();
+
+  if (existing) return existing.id;
+
+  // Create new
+  const { data: newTopic, error } = await supabase
+    .from('temas_produccion')
+    .insert({ nombre: topicName, categoria: 'Auto-detectado' })
+    .select('id')
+    .single();
+
+  if (error) { console.error('[dataService] getOrCreateTopic:', error.message); return null; }
+  return newTopic?.id;
+}
+
+export async function insertVideo(videoData) {
+  if (!supabase) return null;
+
+  const idTema = await getOrCreateTopic(videoData.tema);
+
+  const { data, error } = await supabase
+    .from('videos_analizados')
+    .insert({
+      url: videoData.url,
+      video_id_tiktok: videoData.video_id_tiktok || null,
+      titulo: videoData.titulo || null,
+      id_tema: idTema,
+      tema_auto_generado: videoData.temaAutoGenerado || false,
+      total_comentarios: videoData.totalComentarios || 0,
+      total_analizados: videoData.totalAnalizados || 0,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    // Si ya existe por constraint (video_id_tiktok unique), actualizar totales
+    if (error.code === '23505') {
+      const { data: existing } = await supabase
+        .from('videos_analizados')
+        .update({
+          total_comentarios: videoData.totalComentarios,
+          total_analizados: videoData.totalAnalizados,
+          id_tema: idTema
+        })
+        .eq('video_id_tiktok', videoData.video_id_tiktok)
+        .select('id')
+        .single();
+      return existing?.id;
+    }
+    console.error('[dataService] insertVideo:', error.message);
+    return null;
+  }
+
+  return data?.id;
+}
+
 // ── Insert prediction ───────────────────────────────────
 
 export async function insertPrediction(prediction) {
