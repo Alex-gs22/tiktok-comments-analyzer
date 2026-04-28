@@ -123,29 +123,42 @@ export default function VideoPage() {
 
       let allComments = [];
       let cursor = 0;
-      let hasMore = true;
       let attempts = 0;
+      let consecutiveEmpty = 0;
 
-      while (hasMore && allComments.length < 800 && attempts < 40) {
+      while (allComments.length < 800 && attempts < 40 && consecutiveEmpty < 3) {
         attempts++;
-        const commentResponse = await fetch(`https://www.tikwm.com/api/comment/list/?url=${encodeURIComponent(videoUrl)}&count=50&cursor=${cursor}`);
-        const commentData = await commentResponse.json();
+        try {
+          const commentResponse = await fetch(`https://www.tikwm.com/api/comment/list/?url=${encodeURIComponent(videoUrl)}&count=50&cursor=${cursor}`);
+          const commentData = await commentResponse.json();
 
-        if (commentData.code !== 0 || !commentData.data || !commentData.data.comments) break;
+          if (commentData.code !== 0 || !commentData.data || !commentData.data.comments || commentData.data.comments.length === 0) {
+            consecutiveEmpty++;
+          } else {
+            consecutiveEmpty = 0; // Reset on success
+            
+            const validComments = commentData.data.comments
+              .filter(c => c.text && c.text.length >= 2 && !c.text.includes("[sticker]"))
+              .map(c => ({
+                id_comment: c.id,
+                texto_raw: c.text,
+                likes: c.digg_count || 0,
+                fecha: c.create_time ? new Date(c.create_time * 1000).toISOString() : new Date().toISOString()
+              }));
 
-        const validComments = commentData.data.comments
-          .filter(c => c.text && c.text.length >= 2 && !c.text.includes("[sticker]"))
-          .map(c => ({
-            id_comment: c.id,
-            texto_raw: c.text,
-            likes: c.digg_count || 0,
-            fecha: c.create_time ? new Date(c.create_time * 1000).toISOString() : new Date().toISOString()
-          }));
-
-        allComments = allComments.concat(validComments);
-        hasMore = commentData.data.comments.length > 0 && commentData.data.cursor !== cursor;
-        cursor = commentData.data.cursor;
-        await new Promise(res => setTimeout(res, 300));
+            // Agregar evitando duplicados
+            validComments.forEach(vc => {
+              if (!allComments.find(ac => ac.id_comment === vc.id_comment)) {
+                allComments.push(vc);
+              }
+            });
+          }
+          
+          cursor += 50; // TikWM usa el cursor estrictamente como offset
+        } catch (e) {
+          consecutiveEmpty++;
+        }
+        await new Promise(res => setTimeout(res, 400));
       }
 
       const scraperData = {
