@@ -143,7 +143,7 @@ export default function VideoPage() {
           }));
 
         allComments = allComments.concat(validComments);
-        hasMore = commentData.data.has_more === 1;
+        hasMore = commentData.data.comments.length > 0 && commentData.data.cursor !== cursor;
         cursor = commentData.data.cursor;
         await new Promise(res => setTimeout(res, 300));
       }
