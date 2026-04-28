@@ -54,7 +54,8 @@ export default function ConfidenceHeatmap({ labels, data }) {
                       className="rounded-lg h-10 flex items-center justify-center text-xs font-bold transition-transform hover:scale-105"
                       style={{
                         backgroundColor: getHeatColor(val),
-                        color: val > 0.6 ? '#f0f0f5' : '#6b6b80',
+                        color: '#f0f0f5',
+                        textShadow: val < 0.5 ? '0 1px 3px rgba(0,0,0,0.8)' : 'none',
                       }}
                     >
                       {(val * 100).toFixed(0)}%

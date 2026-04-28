@@ -219,7 +219,7 @@ body {
     rgba(255, 255, 255, 0.04) 75%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.5s ease-in-out infinite;
   border-radius: var(--radius-md);
 }
 
@@ -227,6 +227,28 @@ body {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* Fade in for individual skeleton elements */
+.skeleton-fade-in {
+  animation: skeleton-appear 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes skeleton-appear {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Stagger children in a skeleton container */
+.skeleton-stagger > * {
+  animation: skeleton-appear 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.skeleton-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.skeleton-stagger > *:nth-child(2) { animation-delay: 80ms; }
+.skeleton-stagger > *:nth-child(3) { animation-delay: 160ms; }
+.skeleton-stagger > *:nth-child(4) { animation-delay: 240ms; }
+.skeleton-stagger > *:nth-child(5) { animation-delay: 320ms; }
+.skeleton-stagger > *:nth-child(6) { animation-delay: 400ms; }
 
 /* ── Tooltip (recharts override) ──────────────────────── */
 
@@ -244,4 +266,96 @@ body {
 
 .recharts-tooltip-wrapper .recharts-default-tooltip .recharts-tooltip-item {
   color: var(--text-secondary) !important;
+}
+
+/* ── Plutchik Wheel ──────────────────────────────────── */
+
+.plutchik-svg {
+  overflow: visible;
+}
+
+.plutchik-petal {
+  cursor: pointer;
+}
+
+.plutchik-label {
+  user-select: none;
+}
+
+.plutchik-tooltip {
+  pointer-events: none;
+  z-index: 10;
+  animation: plutchik-tooltip-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.plutchik-tooltip-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: rgba(22, 22, 38, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid;
+  border-radius: var(--radius-lg);
+  padding: 10px 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+
+.plutchik-tooltip-emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.plutchik-tooltip-name {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.plutchik-tooltip-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.plutchik-tooltip-count {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+@keyframes plutchik-tooltip-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.plutchik-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  transition: all 0.3s ease;
+}
+
+.plutchik-legend-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.plutchik-legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: box-shadow 0.3s ease;
 }

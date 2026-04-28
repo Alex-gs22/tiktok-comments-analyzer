@@ -12,7 +12,7 @@ import { Target } from 'lucide-react';
  *   profiles — { "Topic Name": { Alegría: 34.2, ... }, ... }
  */
 
-const PROFILE_COLORS = ['#06b6d4', '#8b5cf6', '#f59e0b'];
+export const PROFILE_COLORS = ['#06b6d4', '#8b5cf6', '#f59e0b'];
 
 export default function EmotionRadar({ profiles }) {
   const profileNames = Object.keys(profiles);

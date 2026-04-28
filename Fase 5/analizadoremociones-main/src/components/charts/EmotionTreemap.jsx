@@ -1,5 +1,5 @@
 "use client";
-import { Treemap, ResponsiveContainer, Tooltip } from 'recharts';
+import { useMemo } from 'react';
 import { EMOTIONS } from '../../lib/emotionConfig';
 import GlassCard from '../GlassCard';
 import SectionHeader from '../SectionHeader';
@@ -7,86 +7,15 @@ import { LayoutGrid } from 'lucide-react';
 
 /**
  * EmotionTreemap — Proportional distribution of predicted emotions.
+ * Uses a pure CSS grid approach instead of Recharts Treemap to avoid
+ * re-render flicker when sidebar opens/closes.
  *
  * Props:
  *   data — Array of { emotion, total, porcentaje, confianzaPromedio }
  */
-
-const CustomContent = ({ x, y, width, height, emotion, porcentaje }) => {
-  const config = EMOTIONS[emotion] || EMOTIONS.Incierto;
-  if (width < 40 || height < 40) return null;
-
-  return (
-    <g>
-      <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
-        rx={8}
-        fill={config.color}
-        fillOpacity={0.2}
-        stroke={config.color}
-        strokeWidth={1}
-        strokeOpacity={0.3}
-      />
-      <text
-        x={x + width / 2}
-        y={y + height / 2 - 12}
-        textAnchor="middle"
-        dominantBaseline="central"
-        className="text-xl"
-        fill={config.color}
-      >
-        {config.emoji}
-      </text>
-      <text
-        x={x + width / 2}
-        y={y + height / 2 + 8}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={width > 80 ? 13 : 11}
-        fontWeight={600}
-        fill={config.color}
-      >
-        {emotion}
-      </text>
-      <text
-        x={x + width / 2}
-        y={y + height / 2 + 24}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={11}
-        fill="rgba(255,255,255,0.5)"
-      >
-        {porcentaje}%
-      </text>
-    </g>
-  );
-};
-
-const CustomTooltip = ({ active, payload }) => {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-  const config = EMOTIONS[d.emotion] || EMOTIONS.Incierto;
-
-  return (
-    <div className="bg-elevated border border-subtle rounded-xl px-4 py-3 shadow-lg">
-      <p className="font-bold text-[#f0f0f5] flex items-center gap-2">
-        <span>{config.emoji}</span> {d.emotion}
-      </p>
-      <p className="text-sm text-[#a1a1b5]">{d.total.toLocaleString()} comentarios ({d.porcentaje}%)</p>
-      <p className="text-xs text-[#6b6b80] mt-1">Confianza promedio: {(d.confianzaPromedio * 100).toFixed(1)}%</p>
-    </div>
-  );
-};
-
 export default function EmotionTreemap({ data }) {
-  const treemapData = data.map((d) => ({
-    ...d,
-    name: d.emotion,
-    size: d.total,
-  }));
+  const sorted = useMemo(() => [...data].sort((a, b) => b.total - a.total), [data]);
+  const maxTotal = useMemo(() => Math.max(...sorted.map((d) => d.total), 1), [sorted]);
 
   return (
     <GlassCard>
@@ -95,17 +24,56 @@ export default function EmotionTreemap({ data }) {
         title="Distribución de Predicciones"
         subtitle="Proporción de cada emoción en las predicciones acumuladas"
       />
-      <div className="mt-4">
-        <ResponsiveContainer width="100%" height={280}>
-          <Treemap
-            data={treemapData}
-            dataKey="size"
-            content={<CustomContent />}
-            animationDuration={800}
-          >
-            <Tooltip content={<CustomTooltip />} />
-          </Treemap>
-        </ResponsiveContainer>
+      <div className="mt-4 grid grid-cols-3 gap-2" style={{ gridAutoRows: 'minmax(100px, auto)' }}>
+        {sorted.map((d, i) => {
+          const config = EMOTIONS[d.emotion] || EMOTIONS.Incierto;
+          // First 2 items are larger
+          const isLarge = i < 2;
+          return (
+            <div
+              key={d.emotion}
+              className={`group relative rounded-xl overflow-hidden flex flex-col items-center justify-center p-3 cursor-default transition-transform duration-200 hover:scale-[1.02] ${isLarge ? 'row-span-1' : ''}`}
+              style={{
+                backgroundColor: `${config.color}18`,
+                border: `1px solid ${config.color}30`,
+                gridColumn: isLarge ? 'span 1' : undefined,
+                minHeight: isLarge ? '130px' : '100px',
+              }}
+            >
+              {/* Glow on hover */}
+              <div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{ background: `radial-gradient(circle at center, ${config.color}12 0%, transparent 70%)` }}
+              />
+
+              <span className="text-2xl mb-1 relative z-10">{config.emoji}</span>
+              <span
+                className="text-sm font-bold relative z-10"
+                style={{ color: config.color }}
+              >
+                {d.emotion}
+              </span>
+              <span className="text-xs text-[rgba(255,255,255,0.5)] relative z-10 mt-0.5">
+                {d.porcentaje}%
+              </span>
+              <span className="text-[10px] text-[rgba(255,255,255,0.3)] relative z-10">
+                {d.total.toLocaleString()}
+              </span>
+
+              {/* Proportion bar at bottom */}
+              <div className="absolute bottom-0 left-0 right-0 h-1">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${(d.total / maxTotal) * 100}%`,
+                    backgroundColor: config.color,
+                    opacity: 0.5,
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </GlassCard>
   );

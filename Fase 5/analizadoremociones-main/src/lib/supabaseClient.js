@@ -1,38 +1,33 @@
-/**
- * supabaseClient.js
- * ─────────────────────────────────────────────────────────
- * Supabase client placeholder.
- *
- * Replace SUPABASE_URL and SUPABASE_ANON_KEY with your
- * real credentials when connecting to production.
- *
- * Tables used by this dashboard:
- *   - temas_produccion
- *   - videos_analizados
- *   - predicciones
- *   - sesiones_analisis
- *
- * Views:
- *   - v_dashboard_kpis
- *   - v_distribucion_emociones
- *   - v_distribucion_por_tema
- *   - v_sentimiento_agregado
- *   - v_timeline_semanal
- *   - v_top_confiables
- * ─────────────────────────────────────────────────────────
- */
+import { createClient } from '@supabase/supabase-js';
 
-// TODO: Install @supabase/supabase-js and uncomment:
-//
-// import { createClient } from '@supabase/supabase-js';
-//
-// const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-// const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
-//
-// export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+const SUPABASE_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  '';
 
-/**
- * Placeholder — returns null until Supabase is configured.
- * Components should fall back to mockData when this is null.
- */
-export const supabase = null;
+const isPlaceholder =
+  SUPABASE_URL.includes('YOUR_PROJECT') ||
+  SUPABASE_KEY.includes('YOUR_ANON_KEY');
+
+const isConfigured =
+  SUPABASE_URL.length > 0 &&
+  SUPABASE_KEY.length > 0 &&
+  !isPlaceholder;
+
+if (typeof window !== 'undefined') {
+  if (isConfigured) {
+    console.log('[Supabase] ✅ Conectado a:', SUPABASE_URL);
+  } else {
+    console.warn(
+      '[Supabase] ⚠️ No configurado — mostrando datos mock.\n' +
+      `URL: "${SUPABASE_URL}" | Key length: ${SUPABASE_KEY.length}`
+    );
+  }
+}
+
+export const supabase = isConfigured
+  ? createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
+
+export const isSupabaseReady = () => supabase !== null;

@@ -1,5 +1,5 @@
 -- ============================================================
--- Fase 5 — Tablas de Predicciones en Producción
+-- 009 — Fase 5: Tablas de Predicciones en Producción
 -- ============================================================
 -- Estas tablas almacenan los resultados del modelo en producción.
 -- Son INDEPENDIENTES de las tablas de entrenamiento (corpus, corpus_training).
