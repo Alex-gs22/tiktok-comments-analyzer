@@ -28,7 +28,14 @@ export default {
       const metaData = await metaResponse.json();
 
       if (metaData.code !== 0 || !metaData.data) {
-        throw new Error("No se pudo obtener la información del video. Verifica que la URL sea pública.");
+        return new Response(JSON.stringify({ 
+          error: "No se pudo obtener la información del video.",
+          url_received: videoUrl,
+          tikwm_response: metaData 
+        }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
       }
 
       const videoInfo = metaData.data;
