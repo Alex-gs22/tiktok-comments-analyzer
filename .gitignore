@@ -34,6 +34,10 @@ runs/
 *.csv
 *.tsv
 *.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!*.eslintrc.json
 *.jsonl
 data/
 datasets/
