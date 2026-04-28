@@ -1,0 +1,2 @@
+ALTER TABLE corpus
+ADD COLUMN intensidad SMALLINT;
