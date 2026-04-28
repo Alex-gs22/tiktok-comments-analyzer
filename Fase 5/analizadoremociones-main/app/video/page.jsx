@@ -38,13 +38,66 @@ export default function VideoPage() {
     const startTime = Date.now();
 
     try {
-      // 1. Scrape comments from Cloudflare Worker
-      const scraperRes = await fetch(`https://tiktok-scraper-worker.alex-gs1978.workers.dev/?url=${encodeURIComponent(videoUrl)}`);
-      const scraperData = await scraperRes.json();
+      // 1. Scrape comments directly from TikWM API (Bypasses Cloudflare Worker shared IP limits)
+      const metaResponse = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(videoUrl)}`);
+      const metaData = await metaResponse.json();
 
-      if (!scraperRes.ok || scraperData.error) {
-        throw new Error(scraperData.error || 'Error al extraer comentarios del video.');
+      if (metaData.code !== 0 || !metaData.data) {
+        throw new Error(`Error de TikWM: ${metaData.msg || 'No se pudo obtener el video'}. (Asegúrate de que la URL es correcta)`);
       }
+
+      const videoInfo = metaData.data;
+      const title = videoInfo.title || "";
+      
+      const detectTopic = (text) => {
+        const t = text.toLowerCase();
+        if (t.includes('checo') || t.includes('f1') || t.includes('formula 1') || t.includes('red bull')) return 'Checo Pérez';
+        if (t.includes('migrante') || t.includes('ice') || t.includes('deportación') || t.includes('frontera')) return 'Desalojo de Migrantes';
+        if (t.includes('boleto') || t.includes('reventa') || t.includes('ticketmaster') || t.includes('estafa')) return 'Estafas de Boletos (Reventa)';
+        if (t.includes('lenguaje inclusivo') || t.includes('pronombre') || t.includes('elle')) return 'Lenguaje Inclusivo';
+        if (t.includes('amlo') || t.includes('sheinbaum') || t.includes('gobierno') || t.includes('política')) return 'Política MX';
+        if (t.includes('tesla') || t.includes('elon') || t.includes('spacex')) return 'Tesla';
+        return 'Tema Desconocido';
+      };
+
+      const detectedTopic = detectTopic(title);
+
+      let allComments = [];
+      let cursor = 0;
+      let hasMore = true;
+      let attempts = 0;
+
+      while (hasMore && allComments.length < 500 && attempts < 10) {
+        attempts++;
+        const commentResponse = await fetch(`https://www.tikwm.com/api/comment/list/?url=${encodeURIComponent(videoUrl)}&count=50&cursor=${cursor}`);
+        const commentData = await commentResponse.json();
+
+        if (commentData.code !== 0 || !commentData.data || !commentData.data.comments) break;
+
+        const validComments = commentData.data.comments
+          .filter(c => c.text && c.text.length >= 2 && !c.text.includes("[sticker]"))
+          .map(c => ({
+            id_comment: c.id,
+            texto_raw: c.text,
+            likes: c.digg_count || 0,
+            fecha: c.create_time ? new Date(c.create_time * 1000).toISOString() : new Date().toISOString()
+          }));
+
+        allComments = allComments.concat(validComments);
+        hasMore = commentData.data.has_more === 1;
+        cursor = commentData.data.cursor;
+        await new Promise(res => setTimeout(res, 300));
+      }
+
+      const scraperData = {
+        video_id: videoInfo.id,
+        author: videoInfo.author?.nickname || 'Desconocido',
+        title: title,
+        play_count: videoInfo.play_count || 0,
+        digg_count: videoInfo.digg_count || 0,
+        detected_topic: detectedTopic,
+        comments: allComments.slice(0, 500)
+      };
 
       if (!scraperData.comments || scraperData.comments.length === 0) {
         throw new Error('No se encontraron comentarios válidos en el video.');
