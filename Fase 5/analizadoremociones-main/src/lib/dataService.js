@@ -555,6 +555,34 @@ export async function insertVideo(videoData) {
   return data?.id;
 }
 
+export async function getExistingVideoAnalysis(videoIdTiktok) {
+  if (!supabase || !videoIdTiktok) return null;
+
+  const { data: video, error: vErr } = await supabase
+    .from('videos_analizados')
+    .select(`
+      id,
+      video_id_tiktok,
+      titulo,
+      url,
+      total_analizados,
+      temas_produccion ( nombre )
+    `)
+    .eq('video_id_tiktok', videoIdTiktok)
+    .single();
+
+  if (vErr || !video) return null;
+
+  const { data: predicciones, error: pErr } = await supabase
+    .from('predicciones')
+    .select('texto, emocion, confianza, esIncierto, likes')
+    .eq('idVideo', video.id);
+
+  if (pErr || !predicciones) return null;
+
+  return { video, predicciones };
+}
+
 // ── Insert prediction ───────────────────────────────────
 
 export async function insertPrediction(prediction) {

@@ -8,7 +8,7 @@ import KpiCard from '../../src/components/KpiCard';
 import CommentTable from '../../src/components/CommentTable';
 import { EMOTIONS, MODEL_INFO } from '../../src/lib/emotionConfig';
 import { classifyBatch } from '../../src/lib/inferenceService';
-import { insertPrediction, insertSession, insertVideo } from '../../src/lib/dataService';
+import { insertPrediction, insertSession, insertVideo, getExistingVideoAnalysis } from '../../src/lib/dataService';
 import { Hash, ToggleLeft, ToggleRight, Download, MessageCircle, Flame, AlertTriangle, BarChart3, Link, Loader2, Play } from 'lucide-react';
 
 export default function VideoPage() {
@@ -38,6 +38,65 @@ export default function VideoPage() {
     const startTime = Date.now();
 
     try {
+      // 0. Check if the video is already analyzed to avoid duplicates
+      const match = videoUrl.match(/\/(?:video|v)\/(\d+)/);
+      const videoIdTiktok = match ? match[1] : null;
+
+      if (videoIdTiktok) {
+        setStep('checking_db');
+        const existingData = await getExistingVideoAnalysis(videoIdTiktok);
+        
+        if (existingData && existingData.predicciones && existingData.predicciones.length > 0) {
+          const { video, predicciones } = existingData;
+          
+          let totalInciertos = 0;
+          let totalConfianza = 0;
+          const emotionCounts = {};
+
+          const commentResults = predicciones.map(p => {
+            if (p.esIncierto) totalInciertos++;
+            totalConfianza += p.confianza;
+            emotionCounts[p.emocion] = (emotionCounts[p.emocion] || 0) + 1;
+            return { texto: p.texto, emocion: p.emocion, confianza: p.confianza, likes: p.likes };
+          });
+
+          const emocionDominante = Object.entries(emotionCounts)
+            .filter(([k]) => k !== 'Incierto')
+            .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Incierto';
+
+          const summary = {
+            total: predicciones.length,
+            totalInciertos,
+            emocionDominante,
+            confianzaPromedio: totalConfianza / predicciones.length,
+            duracionMs: 0, // Instantáneo desde DB
+            distribution: Object.entries(emotionCounts).map(([emotion, count]) => ({
+              emotion,
+              count,
+              pct: ((count / predicciones.length) * 100).toFixed(1),
+            })).sort((a, b) => b.count - a.count),
+            comments: commentResults.sort((a, b) => b.confianza - a.confianza),
+          };
+
+          setVideoInfo({
+            video_id: video.video_id_tiktok,
+            title: video.titulo,
+            play_count: 0,
+            digg_count: 0,
+            author: 'Recuperado de DB',
+            detected_topic: video.temas_produccion?.nombre || 'Tema General',
+            comments_extracted: video.total_analizados,
+            comments: []
+          });
+
+          if (autoTopic) setTopic(video.temas_produccion?.nombre || '');
+          setResults(summary);
+          setStep('complete');
+          return;
+        }
+      }
+
+      setStep('scraping');
       // 1. Scrape comments directly from TikWM API (Bypasses Cloudflare Worker shared IP limits)
       const metaResponse = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(videoUrl)}`);
       const metaData = await metaResponse.json();
@@ -67,7 +126,7 @@ export default function VideoPage() {
       let hasMore = true;
       let attempts = 0;
 
-      while (hasMore && allComments.length < 500 && attempts < 10) {
+      while (hasMore && allComments.length < 800 && attempts < 40) {
         attempts++;
         const commentResponse = await fetch(`https://www.tikwm.com/api/comment/list/?url=${encodeURIComponent(videoUrl)}&count=50&cursor=${cursor}`);
         const commentData = await commentResponse.json();
@@ -96,7 +155,7 @@ export default function VideoPage() {
         play_count: videoInfo.play_count || 0,
         digg_count: videoInfo.digg_count || 0,
         detected_topic: detectedTopic,
-        comments: allComments.slice(0, 500)
+        comments: allComments.slice(0, 800)
       };
 
       if (!scraperData.comments || scraperData.comments.length === 0) {
