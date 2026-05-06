@@ -113,7 +113,7 @@ export default function TemasPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <KpiCard title="Emoción Dominante" value={dominantEmotion} subtext={`${dominantPct}% de los comentarios`} icon={Hash} color={EMOTIONS[dominantEmotion]?.color || "#888"} animate={false} />
+          <KpiCard title="Emoción Dominante" value={dominantEmotion} subtext={`${dominantPct}% de los comentarios`} icon={Hash} color={EMOTIONS[dominantEmotion]?.color || "#888"} animate={false} pulse={true} />
           <KpiCard title="Δ vs Global" value={parseFloat(delta)} suffix="pp" prefix={parseFloat(delta) > 0 ? "+" : ""} subtext={`Diferencia con promedio global (${globalPct}%)`} icon={TrendingUp} color={parseFloat(delta) > 0 ? "#F87171" : "#34D399"} decimals={1} delay={0.1} />
           <KpiCard title="Confianza Promedio" value={topicData.confianzaPromedio ? (topicData.confianzaPromedio * 100) : 0} suffix="%" subtext="Certeza promedio del modelo" icon={BarChart3} color="#8b5cf6" decimals={1} delay={0.2} />
         </div>

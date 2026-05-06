@@ -6,16 +6,18 @@ import AnimatedNumber from './AnimatedNumber';
  * KpiCard — Dark glassmorphism KPI card with animated numbers.
  *
  * Props:
- *   title    — Label above the number
- *   value    — Numeric value or string
- *   subtext  — Small text below value
- *   icon     — Lucide icon component
- *   color    — Emotion/accent colour hex
- *   suffix   — Text after number (e.g. '%')
- *   prefix   — Text before number
- *   decimals — Decimal places for animated number
- *   animate  — Animate the number (default true)
- *   delay    — Animation delay in seconds
+ *   title       — Label above the number
+ *   value       — Numeric value or string
+ *   subtext     — Small text below value
+ *   icon        — Lucide icon component
+ *   color       — Emotion/accent colour hex
+ *   suffix      — Text after number (e.g. '%')
+ *   prefix      — Text before number
+ *   decimals    — Decimal places for animated number
+ *   animate     — Animate the number (default true)
+ *   delay       — Animation delay in seconds
+ *   pulse       — Enable pulse animation (default false)
+ *   pulseColor  — Color to pulse to (default: color param)
  */
 export default function KpiCard({
   title,
@@ -28,8 +30,11 @@ export default function KpiCard({
   decimals = 0,
   animate = true,
   delay = 0,
+  pulse = false,
+  pulseColor = null,
 }) {
   const isNumeric = typeof value === 'number';
+  const finalPulseColor = pulseColor || color;
 
   return (
     <motion.div 
@@ -41,18 +46,24 @@ export default function KpiCard({
       {/* Glow accent */}
       <div 
         className="absolute -top-12 -right-12 w-24 h-24 rounded-full blur-3xl opacity-10 group-hover:opacity-20 transition-opacity"
-        style={{ backgroundColor: color }}
+        style={{ backgroundColor: pulse ? finalPulseColor : color }}
       />
 
       <div className="flex justify-between items-start relative z-10">
         <div className="flex flex-col gap-1">
           <p className="text-xs font-medium text-[#6b6b80] uppercase tracking-wider">{title}</p>
-          <h3 className="text-3xl font-bold text-[#f0f0f5]">
-            {isNumeric && animate ? (
-              <AnimatedNumber value={value} prefix={prefix} suffix={suffix} decimals={decimals} />
-            ) : (
-              <>{prefix}{typeof value === 'number' ? value.toLocaleString('es-MX') : value}{suffix}</>
-            )}
+          <h3 className="text-3xl font-bold">
+            <motion.div
+              animate={pulse ? { scale: [1, 1.06, 1], color: [color, finalPulseColor, color] } : {}}
+              transition={pulse ? { duration: 2.2, ease: 'easeInOut' } : {}}
+              style={{ color: pulse ? color : '#f0f0f5' }}
+            >
+              {isNumeric && animate ? (
+                <AnimatedNumber value={value} prefix={prefix} suffix={suffix} decimals={decimals} />
+              ) : (
+                <>{prefix}{typeof value === 'number' ? value.toLocaleString('es-MX') : value}{suffix}</>
+              )}
+            </motion.div>
           </h3>
         </div>
         

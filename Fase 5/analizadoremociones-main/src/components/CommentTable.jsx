@@ -5,7 +5,28 @@ import EmotionBadge from './EmotionBadge';
 import { MessageSquare, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 
 const PAGE_SIZE = 5;
+ 
+// Confidence gradient helper
+function getConfidenceGradient(confidence) {
+  if (confidence < 0.55) return 'linear-gradient(90deg, #ef4444, #f87171)';
+  if (confidence < 0.70) return 'linear-gradient(90deg, #f59e0b, #fbbf24)';
+  return 'linear-gradient(90deg, #10b981, #34d399)';
+}
 
+function ConfidenceBar({ value = 0 }) {
+  const pct = Math.round(value * 100);
+  return (
+    <div className="flex items-center justify-center gap-2">
+      <div className="w-16 h-1.5 bg-[rgba(255,255,255,0.04)] rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${value * 100}%`, background: getConfidenceGradient(value) }}
+        />
+      </div>
+      <span className="text-[10px] font-bold text-[#6b6b80]">{pct}%</span>
+    </div>
+  );
+}
 /**
  * CommentTable — Dark themed table of analyzed comments with filtering.
  *
@@ -100,15 +121,7 @@ export default function CommentTable({ comments, showFilters = true }) {
                     <EmotionBadge emotion={item.emocion} size="sm" />
                   </td>
                   <td className="px-5 py-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-16 h-1.5 bg-[rgba(255,255,255,0.04)] rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${item.confianza * 100}%`, backgroundColor: config.color }}
-                        />
-                      </div>
-                      <span className="text-[10px] font-bold text-[#6b6b80]">{(item.confianza * 100).toFixed(0)}%</span>
-                    </div>
+                    <ConfidenceBar value={item.confianza} />
                   </td>
                   <td className="px-5 py-4 text-xs text-[#6b6b80] text-center">
                     {item.likes?.toLocaleString() || '—'}
