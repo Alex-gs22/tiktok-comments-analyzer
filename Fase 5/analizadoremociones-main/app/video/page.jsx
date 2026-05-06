@@ -9,7 +9,7 @@ import CommentTable from '../../src/components/CommentTable';
 import { EMOTIONS, MODEL_INFO } from '../../src/lib/emotionConfig';
 import { classifyBatch } from '../../src/lib/inferenceService';
 import { insertPrediction, insertSession, insertVideo, getExistingVideoAnalysis, getTopics } from '../../src/lib/dataService';
-import { Hash, ToggleLeft, ToggleRight, Download, MessageCircle, Flame, AlertTriangle, BarChart3, Link, Loader2, Play, ChevronDown, BookOpen } from 'lucide-react';
+import { Hash, ToggleLeft, ToggleRight, Download, MessageCircle, Flame, AlertTriangle, BarChart3, Link, Loader2, Play, ChevronDown, BookOpen, RotateCcw } from 'lucide-react';
 
 export default function VideoPage() {
   const [videoUrl, setVideoUrl] = useState('');
@@ -43,6 +43,17 @@ export default function VideoPage() {
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [videoInfo, setVideoInfo] = useState(null);
   const [results, setResults] = useState(null);
+
+  const handleReset = useCallback(() => {
+    setVideoUrl('');
+    setTopic('');
+    setAutoTopic(true);
+    setStep('idle');
+    setErrorMsg(null);
+    setProgress({ current: 0, total: 0 });
+    setVideoInfo(null);
+    setResults(null);
+  }, []);
 
   const loadExampleUrl = () => {
     setVideoUrl('https://www.tiktok.com/@pavelorockstar/video/7588331288608673025');
@@ -449,12 +460,20 @@ export default function VideoPage() {
                 <p className="text-xs text-[#a1a1b5] font-medium mb-1">@{videoInfo.author}</p>
                 <h3 className="text-sm font-bold text-[#f0f0f5] truncate">{videoInfo.title || 'Video sin título'}</h3>
               </div>
-              <div className="flex gap-4 text-xs text-[#a1a1b5]">
+              <div className="flex gap-3 items-center text-xs text-[#a1a1b5]">
                 <span className="flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> {videoInfo.play_count?.toLocaleString()}</span>
                 <span className="flex items-center gap-1.5"><Flame className="w-3.5 h-3.5" /> {videoInfo.digg_count?.toLocaleString()}</span>
                 <span className="flex items-center gap-1.5 font-semibold text-accent-cyan bg-accent-cyan/10 px-2 py-1 rounded-lg">
                   <Hash className="w-3.5 h-3.5" /> {topic}
                 </span>
+                <button
+                  onClick={handleReset}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-subtle text-[#6b6b80] hover:text-[#f0f0f5] hover:border-[#6b6b80] transition-all"
+                  title="Limpiar y analizar otro video"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Nuevo análisis
+                </button>
               </div>
             </div>
 

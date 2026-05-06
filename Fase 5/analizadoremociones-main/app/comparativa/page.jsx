@@ -21,9 +21,8 @@ export default function ComparativaPage() {
 
   const loadInitial = useCallback(async () => {
     setLoading(true);
-    const [tData, hData] = await Promise.all([getTopics(), getConfidenceHeatmap()]);
+    const tData = await getTopics();
     setTopics(tData);
-    setHeatmap(hData);
     const defaultSelected = tData.slice(0, Math.min(3, tData.length)).map((tp) => tp.nombre);
     setSelected(defaultSelected);
     setLoading(false);
@@ -34,13 +33,17 @@ export default function ComparativaPage() {
   // Auto-refresh when new data is inserted
   useDataRefresh(loadInitial);
 
+  // Recompute profiles AND heatmap whenever selected topics change
   useEffect(() => {
-    if (selected.length === 0) { setProfiles({}); return; }
+    if (selected.length === 0) { setProfiles({}); setHeatmap(null); return; }
     (async () => {
+      const [hData, ...profileResults] = await Promise.all([
+        getConfidenceHeatmap(selected),
+        ...selected.map((name) => getTopicEmotionProfile(name)),
+      ]);
+      setHeatmap(hData);
       const p = {};
-      for (const name of selected) {
-        p[name] = await getTopicEmotionProfile(name);
-      }
+      selected.forEach((name, i) => { p[name] = profileResults[i]; });
       setProfiles(p);
     })();
   }, [selected]);
