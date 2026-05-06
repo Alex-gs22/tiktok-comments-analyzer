@@ -161,23 +161,25 @@ async function _getTopics() {
 
   const topics = Object.values(temaMap);
 
-  // Compute dominant emotion and confianza promedio for each topic
-  for (const t of topics) {
-    const { data: dist } = await supabase
-      .from('predicciones')
-      .select('emocion_predicha, confianza_maxima')
-      .eq('id_video', t.id)
-      .eq('es_incierto', false);
+  // Compute dominant emotion per topic using v_distribucion_por_tema.
+  // The view groups by (video_id, tema, emocion), so we must SUM totals per (tema, emocion)
+  // across all videos before finding the dominant.
+  const { data: dist } = await supabase
+    .from('v_distribucion_por_tema')
+    .select('tema, emocion_predicha, total');
 
-    if (dist?.length) {
-      const counts = {};
-      let totalConf = 0;
-      dist.forEach((d) => {
-        counts[d.emocion_predicha] = (counts[d.emocion_predicha] || 0) + 1;
-        totalConf += parseFloat(d.confianza_maxima) || 0;
-      });
-      t.emocionDominante = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Incierto';
-      t.confianzaPromedio = parseFloat((totalConf / dist.length).toFixed(3));
+  if (dist?.length) {
+    const temaEmoCounts = {};
+    dist.forEach((d) => {
+      if (!d.tema) return;
+      if (!temaEmoCounts[d.tema]) temaEmoCounts[d.tema] = {};
+      temaEmoCounts[d.tema][d.emocion_predicha] = (temaEmoCounts[d.tema][d.emocion_predicha] || 0) + d.total;
+    });
+    for (const t of topics) {
+      const counts = temaEmoCounts[t.nombre];
+      if (counts) {
+        t.emocionDominante = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+      }
     }
   }
 
@@ -247,18 +249,25 @@ async function _getTopicEmotionProfile(topicName) {
 
   const { data } = await supabase
     .from('v_distribucion_por_tema')
-    .select('*')
+    .select('emocion_predicha, total')
     .eq('tema', topicName);
 
   if (data?.length) {
     const profile = {};
-    const total = data.reduce((s, d) => s + d.total, 0);
     EMOTION_KEYS.forEach((e) => { profile[e] = 0; });
+    // Accumulate totals per emotion across all videos of this topic
     data.forEach((d) => {
       if (profile[d.emocion_predicha] !== undefined) {
-        profile[d.emocion_predicha] = parseFloat(((d.total / total) * 100).toFixed(1));
+        profile[d.emocion_predicha] += d.total;
       }
     });
+    // Convert counts to percentages
+    const total = Object.values(profile).reduce((s, v) => s + v, 0);
+    if (total > 0) {
+      EMOTION_KEYS.forEach((e) => {
+        profile[e] = parseFloat(((profile[e] / total) * 100).toFixed(1));
+      });
+    }
     return profile;
   }
   const profile = {};

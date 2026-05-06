@@ -37,7 +37,7 @@ export default function DashboardPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Auto-refresh when new data is inserted (e.g. from Live Analyzer)
+  // Refresh only when new data is inserted (insertPrediction / insertSession call notifyDataChange)
   useDataRefresh(loadData);
 
   if (loading || !kpis) {

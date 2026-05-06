@@ -8,12 +8,12 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { onDataChange } from './dataCache';
+import { onDataChange, invalidateAll } from './dataCache';
 
 /**
  * @param {Function} refreshFn — Function to call when data changes
  */
-export function useDataRefresh(refreshFn) {
+export function useDataRefresh(refreshFn, pollInterval = null) {
   const fnRef = useRef(refreshFn);
   fnRef.current = refreshFn;
 
@@ -21,4 +21,13 @@ export function useDataRefresh(refreshFn) {
     const unsub = onDataChange(() => fnRef.current());
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (!pollInterval) return;
+    const timer = setInterval(() => {
+      invalidateAll();
+      try { fnRef.current(); } catch (e) { console.error('[useDataRefresh] poll error', e); }
+    }, pollInterval);
+    return () => clearInterval(timer);
+  }, [pollInterval]);
 }

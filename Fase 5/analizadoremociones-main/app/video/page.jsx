@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Header from '../../src/components/Header';
 import GlassCard from '../../src/components/GlassCard';
 import SectionHeader from '../../src/components/SectionHeader';
@@ -8,13 +8,33 @@ import KpiCard from '../../src/components/KpiCard';
 import CommentTable from '../../src/components/CommentTable';
 import { EMOTIONS, MODEL_INFO } from '../../src/lib/emotionConfig';
 import { classifyBatch } from '../../src/lib/inferenceService';
-import { insertPrediction, insertSession, insertVideo, getExistingVideoAnalysis } from '../../src/lib/dataService';
-import { Hash, ToggleLeft, ToggleRight, Download, MessageCircle, Flame, AlertTriangle, BarChart3, Link, Loader2, Play } from 'lucide-react';
+import { insertPrediction, insertSession, insertVideo, getExistingVideoAnalysis, getTopics } from '../../src/lib/dataService';
+import { Hash, ToggleLeft, ToggleRight, Download, MessageCircle, Flame, AlertTriangle, BarChart3, Link, Loader2, Play, ChevronDown, BookOpen } from 'lucide-react';
 
 export default function VideoPage() {
   const [videoUrl, setVideoUrl] = useState('');
   const [topic, setTopic] = useState('');
   const [autoTopic, setAutoTopic] = useState(true);
+  const [existingTopics, setExistingTopics] = useState([]);
+  const [showTopicDropdown, setShowTopicDropdown] = useState(false);
+  const topicDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!autoTopic && existingTopics.length === 0) {
+      getTopics().then((t) => setExistingTopics(t.filter((x) => x.id !== '__independent__')));
+    }
+    setShowTopicDropdown(false);
+  }, [autoTopic]);
+
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (topicDropdownRef.current && !topicDropdownRef.current.contains(e.target)) {
+        setShowTopicDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
   
   // idle | scraping | analyzing | complete | error
   const [step, setStep] = useState('idle'); 
@@ -322,16 +342,48 @@ export default function VideoPage() {
                 <label className="text-xs font-medium text-[#6b6b80] uppercase tracking-wider mb-2 block">
                   Asignar Tema
                 </label>
-                <div className="relative">
-                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4a4a5e]" />
-                  <input
-                    type="text"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    placeholder={autoTopic ? 'El Worker detectará el tema automáticamente...' : 'Ej: Política, Deportes...'}
-                    disabled={autoTopic || step === 'scraping' || step === 'analyzing'}
-                    className="w-full bg-[rgba(255,255,255,0.03)] border border-subtle rounded-xl pl-10 pr-4 py-3 text-sm text-[#f0f0f5] placeholder-[#4a4a5e] disabled:opacity-40 focus:outline-none focus:border-accent-cyan/40 transition-all"
-                  />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4a4a5e]" />
+                    <input
+                      type="text"
+                      value={topic}
+                      onChange={(e) => setTopic(e.target.value)}
+                      placeholder={autoTopic ? 'El Worker detectará el tema automáticamente...' : 'Escribe un tema nuevo...'}
+                      disabled={autoTopic || step === 'scraping' || step === 'analyzing'}
+                      className="w-full bg-[rgba(255,255,255,0.03)] border border-subtle rounded-xl pl-10 pr-4 py-3 text-sm text-[#f0f0f5] placeholder-[#4a4a5e] disabled:opacity-40 focus:outline-none focus:border-accent-cyan/40 transition-all"
+                    />
+                  </div>
+                  {!autoTopic && existingTopics.length > 0 && (
+                    <div ref={topicDropdownRef} className="relative">
+                      <button
+                        onClick={() => setShowTopicDropdown(!showTopicDropdown)}
+                        disabled={step === 'scraping' || step === 'analyzing'}
+                        className="flex items-center gap-2 px-3 py-3 rounded-xl border border-subtle text-xs font-medium text-[#a1a1b5] hover:bg-[rgba(255,255,255,0.03)] transition-all whitespace-nowrap disabled:opacity-40 h-full"
+                        title="Seleccionar tema existente"
+                      >
+                        <BookOpen className="w-4 h-4" />
+                        Existentes
+                        <ChevronDown className={`w-3 h-3 transition-transform ${showTopicDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+                      {showTopicDropdown && (
+                        <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#13131a] border border-subtle shadow-2xl overflow-hidden z-50">
+                          <div className="max-h-56 overflow-y-auto">
+                            {existingTopics.map((t) => (
+                              <button
+                                key={t.id}
+                                onClick={() => { setTopic(t.nombre); setShowTopicDropdown(false); }}
+                                className="w-full text-left px-4 py-2.5 hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+                              >
+                                <p className="text-sm font-medium text-[#f0f0f5] truncate">{t.nombre}</p>
+                                <p className="text-[10px] text-[#4a4a5e] mt-0.5">{t.categoria} · {t.totalComentarios} comentarios</p>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <button

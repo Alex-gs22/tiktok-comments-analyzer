@@ -36,7 +36,7 @@ export default function TemasPage() {
 
   useEffect(() => { loadInitial(); }, [loadInitial]);
 
-  // Auto-refresh when new data is inserted
+  // Refresh only when new data is inserted (insertPrediction / insertSession call notifyDataChange)
   useDataRefresh(loadInitial);
 
   // Load topic-specific data when selection changes
