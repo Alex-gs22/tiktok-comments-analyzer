@@ -161,23 +161,30 @@ async function _getTopics() {
 
   const topics = Object.values(temaMap);
 
-  // Compute dominant emotion and confianza promedio for each topic
-  for (const t of topics) {
-    const { data: dist } = await supabase
-      .from('predicciones')
-      .select('emocion_predicha, confianza_maxima')
-      .eq('id_video', t.id)
-      .eq('es_incierto', false);
+  // Compute dominant emotion per topic using v_distribucion_por_tema.
+  // The view groups by (video_id, tema, emocion), so we must SUM totals per (tema, emocion)
+  // across all videos before finding the dominant.
+  const { data: dist } = await supabase
+    .from('v_distribucion_por_tema')
+    .select('tema, emocion_predicha, total, confianza_promedio');
 
-    if (dist?.length) {
-      const counts = {};
-      let totalConf = 0;
-      dist.forEach((d) => {
-        counts[d.emocion_predicha] = (counts[d.emocion_predicha] || 0) + 1;
-        totalConf += parseFloat(d.confianza_maxima) || 0;
-      });
-      t.emocionDominante = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Incierto';
-      t.confianzaPromedio = parseFloat((totalConf / dist.length).toFixed(3));
+  if (dist?.length) {
+    // Group by tema: accumulate counts and weighted confidence
+    const temaStats = {};
+    dist.forEach((d) => {
+      if (!d.tema) return;
+      if (!temaStats[d.tema]) temaStats[d.tema] = { counts: {}, totalN: 0, weightedConf: 0 };
+      const s = temaStats[d.tema];
+      s.counts[d.emocion_predicha] = (s.counts[d.emocion_predicha] || 0) + d.total;
+      s.totalN += d.total;
+      s.weightedConf += (parseFloat(d.confianza_promedio) || 0) * d.total;
+    });
+    for (const t of topics) {
+      const s = temaStats[t.nombre];
+      if (s) {
+        t.emocionDominante = Object.entries(s.counts).sort((a, b) => b[1] - a[1])[0][0];
+        t.confianzaPromedio = s.totalN > 0 ? parseFloat((s.weightedConf / s.totalN).toFixed(4)) : 0;
+      }
     }
   }
 
@@ -247,18 +254,25 @@ async function _getTopicEmotionProfile(topicName) {
 
   const { data } = await supabase
     .from('v_distribucion_por_tema')
-    .select('*')
+    .select('emocion_predicha, total')
     .eq('tema', topicName);
 
   if (data?.length) {
     const profile = {};
-    const total = data.reduce((s, d) => s + d.total, 0);
     EMOTION_KEYS.forEach((e) => { profile[e] = 0; });
+    // Accumulate totals per emotion across all videos of this topic
     data.forEach((d) => {
       if (profile[d.emocion_predicha] !== undefined) {
-        profile[d.emocion_predicha] = parseFloat(((d.total / total) * 100).toFixed(1));
+        profile[d.emocion_predicha] += d.total;
       }
     });
+    // Convert counts to percentages
+    const total = Object.values(profile).reduce((s, v) => s + v, 0);
+    if (total > 0) {
+      EMOTION_KEYS.forEach((e) => {
+        profile[e] = parseFloat(((profile[e] / total) * 100).toFixed(1));
+      });
+    }
     return profile;
   }
   const profile = {};
@@ -454,38 +468,40 @@ export function getTimelineFiltered(granularity = 'week', topicName = null) {
 
 // ── Confidence heatmap ──────────────────────────────────
 
-async function _getConfidenceHeatmap() {
-  if (!supabase) return mock.confidenceHeatmap;
+async function _getConfidenceHeatmap(topicNames) {
+  if (!supabase || !topicNames?.length) return { labels: { rows: [], cols: EMOTION_KEYS }, data: [] };
 
-  const topics = await _getTopics();
-  if (!topics.length) return { labels: { rows: [], cols: EMOTION_KEYS }, data: [] };
+  const { data, error } = await supabase
+    .from('v_distribucion_por_tema')
+    .select('tema, emocion_predicha, total, confianza_promedio')
+    .in('tema', topicNames);
 
-  const rows = topics.slice(0, 4).map((t) => t.nombre);
-  const cols = EMOTION_KEYS;
-  const data = [];
+  const empty = { labels: { rows: topicNames, cols: EMOTION_KEYS }, data: topicNames.map(() => EMOTION_KEYS.map(() => 0)) };
+  if (error || !data?.length) return empty;
 
-  for (let ri = 0; ri < rows.length; ri++) {
-    const row = [];
-    for (const emotion of cols) {
-      const { data: avg } = await supabase
-        .from('predicciones')
-        .select('confianza_maxima')
-        .eq('emocion_predicha', emotion)
-        .limit(100);
-
-      const avgVal = avg?.length
-        ? avg.reduce((s, d) => s + parseFloat(d.confianza_maxima), 0) / avg.length
-        : 0;
-      row.push(parseFloat(avgVal.toFixed(2)));
-    }
-    data.push(row);
+  // Aggregate weighted confidence per (tema, emocion) across all videos
+  const cellMap = {};
+  for (const d of data) {
+    const key = `${d.tema}||${d.emocion_predicha}`;
+    if (!cellMap[key]) cellMap[key] = { totalN: 0, weightedConf: 0 };
+    cellMap[key].totalN += d.total;
+    cellMap[key].weightedConf += (parseFloat(d.confianza_promedio) || 0) * d.total;
   }
 
-  return { labels: { rows, cols }, data };
+  const matrix = topicNames.map((tema) =>
+    EMOTION_KEYS.map((emotion) => {
+      const cell = cellMap[`${tema}||${emotion}`];
+      if (!cell || cell.totalN === 0) return 0;
+      return parseFloat((cell.weightedConf / cell.totalN).toFixed(4));
+    })
+  );
+
+  return { labels: { rows: topicNames, cols: EMOTION_KEYS }, data: matrix };
 }
 
-export function getConfidenceHeatmap() {
-  return cached('confidence-heatmap', _getConfidenceHeatmap);
+export function getConfidenceHeatmap(topicNames) {
+  const key = `confidence-heatmap-${(topicNames || []).join(',')}`;
+  return cached(key, () => _getConfidenceHeatmap(topicNames));
 }
 
 // ── Insert Video & Topic ────────────────────────────────

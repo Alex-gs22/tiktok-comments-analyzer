@@ -7,7 +7,7 @@ import { Flower2 } from 'lucide-react';
 
 /**
  * PlutchikWheel — Interactive Plutchik wheel mapped to 6 model classes.
- * Uses SVG for rendering with per-petal hover animations.
+ * Responsive SVG, fixed-radius labels, center tooltip.
  *
  * Props:
  *   data — { Alegría: { porcentaje, total }, ... }
@@ -22,27 +22,22 @@ const PETAL_ANGLES = {
   Rechazo:     300,
 };
 
-const SIZE = 380;
-const CX = SIZE / 2;
-const CY = SIZE / 2;
-const MAX_R = 150;
-const MIN_R = 50;
+const SIZE    = 400;
+const CX      = SIZE / 2;
+const CY      = SIZE / 2;
+const MAX_R   = 150;
+const MIN_R   = 52;
+const LABEL_R = 178; // fixed outer label radius
 
-/** Convert polar to cartesian */
 function polarToCartesian(cx, cy, r, angleDeg) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
-  return {
-    x: cx + r * Math.cos(rad),
-    y: cy + r * Math.sin(rad),
-  };
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
-/** Build an SVG arc path for a pie-slice petal */
 function petalPath(cx, cy, radius, startAngle, endAngle) {
   const start = polarToCartesian(cx, cy, radius, endAngle);
-  const end = polarToCartesian(cx, cy, radius, startAngle);
+  const end   = polarToCartesian(cx, cy, radius, startAngle);
   const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-
   return [
     `M ${cx} ${cy}`,
     `L ${start.x} ${start.y}`,
@@ -59,30 +54,26 @@ export default function PlutchikWheel({ data }) {
     [data]
   );
 
-  // Build petal data
   const petals = useMemo(() => {
-    const petalSweep = 360 / EMOTION_KEYS.length; // 60°
-
+    const petalSweep = 360 / EMOTION_KEYS.length;
     return EMOTION_KEYS.map((emotion) => {
-      const config = EMOTIONS[emotion];
-      const pct = data[emotion]?.porcentaje || 0;
-      const total = data[emotion]?.total || 0;
-      const normR = MIN_R + (pct / maxPct) * (MAX_R - MIN_R);
+      const config      = EMOTIONS[emotion];
+      const pct         = data[emotion]?.porcentaje || 0;
+      const total       = data[emotion]?.total || 0;
+      const normR       = MIN_R + (pct / maxPct) * (MAX_R - MIN_R);
       const centerAngle = PETAL_ANGLES[emotion];
-      const startAngle = centerAngle - petalSweep / 2;
-      const endAngle = centerAngle + petalSweep / 2;
-      const path = petalPath(CX, CY, normR, startAngle, endAngle);
-
-      // Label position
-      const labelR = normR + 20;
-      const labelPos = polarToCartesian(CX, CY, labelR, centerAngle);
-
-      return { emotion, config, pct, total, normR, centerAngle, startAngle, endAngle, path, labelPos };
+      const startAngle  = centerAngle - petalSweep / 2;
+      const endAngle    = centerAngle + petalSweep / 2;
+      const path        = petalPath(CX, CY, normR, startAngle, endAngle);
+      const labelPos    = polarToCartesian(CX, CY, LABEL_R, centerAngle);
+      const dividerEnd  = polarToCartesian(CX, CY, MAX_R + 8, centerAngle - petalSweep / 2);
+      return { emotion, config, pct, total, normR, centerAngle, startAngle, endAngle, path, labelPos, dividerEnd };
     });
   }, [data, maxPct]);
 
-  // Ring guides
-  const rings = [0.33, 0.66, 1.0].map((pct) => MIN_R + (MAX_R - MIN_R) * pct);
+  const rings = [0.25, 0.5, 0.75, 1.0].map((f) => MIN_R + (MAX_R - MIN_R) * f);
+
+  const hoveredPetal = hovered ? petals.find((p) => p.emotion === hovered) : null;
 
   return (
     <GlassCard>
@@ -91,42 +82,27 @@ export default function PlutchikWheel({ data }) {
         title="Rueda de Plutchik"
         subtitle="6 emociones del modelo mapeadas al modelo teórico"
       />
-      <div className="flex justify-center mt-4 relative">
+      <div className="mt-4">
         <svg
-          width={SIZE}
-          height={SIZE}
+          width="100%"
           viewBox={`0 0 ${SIZE} ${SIZE}`}
-          className="plutchik-svg"
+          style={{ display: 'block' }}
         >
           <defs>
             {petals.map(({ emotion, config }) => (
-              <radialGradient
-                key={`grad-${emotion}`}
-                id={`grad-${emotion}`}
-                cx="50%"
-                cy="50%"
-                r="50%"
-              >
-                <stop offset="0%" stopColor={config.color} stopOpacity="0.06" />
-                <stop offset="100%" stopColor={config.color} stopOpacity="0.25" />
+              <radialGradient key={`grad-${emotion}`} id={`grad-${emotion}`} cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor={config.color} stopOpacity="0.05" />
+                <stop offset="100%" stopColor={config.color} stopOpacity="0.28" />
               </radialGradient>
             ))}
-            {/* Hover gradients — brighter */}
             {petals.map(({ emotion, config }) => (
-              <radialGradient
-                key={`grad-hover-${emotion}`}
-                id={`grad-hover-${emotion}`}
-                cx="50%"
-                cy="50%"
-                r="50%"
-              >
-                <stop offset="0%" stopColor={config.color} stopOpacity="0.15" />
-                <stop offset="100%" stopColor={config.color} stopOpacity="0.50" />
+              <radialGradient key={`grad-hover-${emotion}`} id={`grad-hover-${emotion}`} cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor={config.color} stopOpacity="0.18" />
+                <stop offset="100%" stopColor={config.color} stopOpacity="0.55" />
               </radialGradient>
             ))}
-            {/* Glow filter */}
             <filter id="petal-glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="8" result="blur" />
+              <feGaussianBlur stdDeviation="7" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
@@ -136,15 +112,16 @@ export default function PlutchikWheel({ data }) {
 
           {/* Guide rings */}
           {rings.map((r, i) => (
-            <circle
-              key={i}
-              cx={CX}
-              cy={CY}
-              r={r}
-              fill="none"
-              stroke="rgba(255,255,255,0.04)"
-              strokeWidth="1"
-            />
+            <circle key={i} cx={CX} cy={CY} r={r} fill="none"
+              stroke="rgba(255,255,255,0.05)" strokeWidth="1" strokeDasharray={i < 3 ? '4 4' : 'none'} />
+          ))}
+
+          {/* Divider lines between petals */}
+          {petals.map(({ emotion, dividerEnd }) => (
+            <line key={`div-${emotion}`}
+              x1={CX} y1={CY}
+              x2={dividerEnd.x} y2={dividerEnd.y}
+              stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
           ))}
 
           {/* Petals */}
@@ -153,12 +130,12 @@ export default function PlutchikWheel({ data }) {
             return (
               <g
                 key={emotion}
-                className="plutchik-petal"
                 style={{
                   transformOrigin: `${CX}px ${CY}px`,
-                  transform: isHovered ? 'scale(1.08)' : 'scale(1)',
+                  transform: isHovered ? 'scale(1.07)' : 'scale(1)',
                   filter: isHovered ? 'url(#petal-glow)' : 'none',
-                  transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease',
+                  transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1), filter 0.3s ease',
+                  cursor: 'pointer',
                 }}
                 onMouseEnter={() => setHovered(emotion)}
                 onMouseLeave={() => setHovered(null)}
@@ -167,120 +144,103 @@ export default function PlutchikWheel({ data }) {
                   d={path}
                   fill={isHovered ? `url(#grad-hover-${emotion})` : `url(#grad-${emotion})`}
                   stroke={config.color}
-                  strokeWidth={isHovered ? 2.5 : 1.5}
-                  strokeOpacity={isHovered ? 0.9 : 0.4}
-                  style={{
-                    transition: 'fill 0.3s ease, stroke-width 0.3s ease, stroke-opacity 0.3s ease',
-                  }}
+                  strokeWidth={isHovered ? 2 : 1.5}
+                  strokeOpacity={isHovered ? 0.9 : 0.35}
+                  style={{ transition: 'all 0.3s ease' }}
                 />
               </g>
             );
           })}
 
-          {/* Labels */}
-          {petals.map(({ emotion, config, pct, labelPos }) => (
-            <text
-              key={`label-${emotion}`}
-              x={labelPos.x}
-              y={labelPos.y}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fill={config.color}
-              fontSize="12"
-              fontWeight="700"
-              fontFamily="Inter, sans-serif"
-              className="plutchik-label"
-              style={{
-                opacity: hovered === null || hovered === emotion ? 1 : 0.35,
-                transition: 'opacity 0.3s ease',
-                pointerEvents: 'none',
-              }}
-            >
-              {config.emoji} {pct}%
-            </text>
-          ))}
+          {/* Fixed-radius labels */}
+          {petals.map(({ emotion, config, pct, labelPos }) => {
+            const isActive = hovered === null || hovered === emotion;
+            return (
+              <g key={`label-${emotion}`}
+                style={{ opacity: isActive ? 1 : 0.25, transition: 'opacity 0.3s ease', pointerEvents: 'none' }}>
+                <text
+                  x={labelPos.x} y={labelPos.y - 7}
+                  textAnchor="middle" dominantBaseline="middle"
+                  fill={config.color} fontSize="13" fontWeight="700" fontFamily="Inter, sans-serif"
+                >
+                  {config.emoji}
+                </text>
+                <text
+                  x={labelPos.x} y={labelPos.y + 8}
+                  textAnchor="middle" dominantBaseline="middle"
+                  fill={config.color} fontSize="9.5" fontWeight="600" fontFamily="Inter, sans-serif"
+                >
+                  {emotion}
+                </text>
+                <text
+                  x={labelPos.x} y={labelPos.y + 20}
+                  textAnchor="middle" dominantBaseline="middle"
+                  fill="#a1a1b5" fontSize="9" fontFamily="Inter, sans-serif"
+                >
+                  {pct}%
+                </text>
+              </g>
+            );
+          })}
 
-          {/* Center label */}
-          <text
-            x={CX}
-            y={CY - 6}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="#f0f0f5"
-            fontSize="13"
-            fontWeight="700"
-            fontFamily="Inter, sans-serif"
-          >
-            6 Emociones
-          </text>
-          <text
-            x={CX}
-            y={CY + 10}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="#6b6b80"
-            fontSize="10"
-            fontFamily="Inter, sans-serif"
-          >
-            Modelo v3_pseudo
-          </text>
+          {/* Center — default info or hovered emotion detail */}
+          {hoveredPetal ? (
+            <g style={{ pointerEvents: 'none' }}>
+              <circle cx={CX} cy={CY} r={MIN_R - 4} fill="rgba(10,10,20,0.7)" />
+              <text x={CX} y={CY - 18} textAnchor="middle" dominantBaseline="middle"
+                fill={hoveredPetal.config.color} fontSize="18" fontFamily="Inter, sans-serif">
+                {hoveredPetal.config.emoji}
+              </text>
+              <text x={CX} y={CY - 2} textAnchor="middle" dominantBaseline="middle"
+                fill={hoveredPetal.config.color} fontSize="10" fontWeight="700" fontFamily="Inter, sans-serif">
+                {hoveredPetal.emotion}
+              </text>
+              <text x={CX} y={CY + 14} textAnchor="middle" dominantBaseline="middle"
+                fill="#f0f0f5" fontSize="13" fontWeight="800" fontFamily="Inter, sans-serif">
+                {hoveredPetal.pct}%
+              </text>
+              <text x={CX} y={CY + 27} textAnchor="middle" dominantBaseline="middle"
+                fill="#6b6b80" fontSize="8.5" fontFamily="Inter, sans-serif">
+                {hoveredPetal.total} coment.
+              </text>
+            </g>
+          ) : (
+            <g style={{ pointerEvents: 'none' }}>
+              <text x={CX} y={CY - 7} textAnchor="middle" dominantBaseline="middle"
+                fill="#f0f0f5" fontSize="12" fontWeight="700" fontFamily="Inter, sans-serif">
+                6 Emociones
+              </text>
+              <text x={CX} y={CY + 9} textAnchor="middle" dominantBaseline="middle"
+                fill="#4a4a5e" fontSize="9" fontFamily="Inter, sans-serif">
+                Modelo v3_pseudo
+              </text>
+            </g>
+          )}
         </svg>
-
-        {/* Tooltip */}
-        {hovered && (() => {
-          const petal = petals.find((p) => p.emotion === hovered);
-          if (!petal) return null;
-          const config = petal.config;
-          // Position tooltip near the hovered petal
-          const tipPos = polarToCartesian(CX, CY, petal.normR * 0.6, petal.centerAngle);
-          return (
-            <div
-              className="plutchik-tooltip"
-              style={{
-                position: 'absolute',
-                left: tipPos.x,
-                top: tipPos.y,
-                transform: 'translate(-50%, -50%)',
-              }}
-            >
-              <div className="plutchik-tooltip-inner" style={{ borderColor: config.color + '40' }}>
-                <span className="plutchik-tooltip-emoji">{config.emoji}</span>
-                <span className="plutchik-tooltip-name" style={{ color: config.color }}>{petal.emotion}</span>
-                <span className="plutchik-tooltip-value">{petal.pct}%</span>
-                <span className="plutchik-tooltip-count">{petal.total} comentarios</span>
-              </div>
-            </div>
-          );
-        })()}
       </div>
 
       {/* Legend */}
-      <div className="grid grid-cols-3 gap-3 mt-6">
+      <div className="grid grid-cols-3 gap-2 mt-4">
         {EMOTION_KEYS.map((emotion) => {
-          const config = EMOTIONS[emotion];
-          const d = data[emotion] || {};
+          const config  = EMOTIONS[emotion];
+          const d       = data[emotion] || {};
           const isActive = hovered === emotion;
           return (
             <div
               key={emotion}
-              className="plutchik-legend-item"
+              className="flex items-center gap-2 p-2 rounded-lg cursor-pointer"
               style={{
-                opacity: hovered === null || isActive ? 1 : 0.4,
-                transform: isActive ? 'scale(1.05)' : 'scale(1)',
-                transition: 'all 0.3s ease',
+                opacity: hovered === null || isActive ? 1 : 0.35,
+                backgroundColor: isActive ? `${config.color}12` : 'transparent',
+                transition: 'all 0.25s ease',
               }}
               onMouseEnter={() => setHovered(emotion)}
               onMouseLeave={() => setHovered(null)}
             >
-              <span
-                className="plutchik-legend-dot"
-                style={{
-                  backgroundColor: config.color,
-                  boxShadow: isActive ? `0 0 8px ${config.color}80` : 'none',
-                }}
-              />
-              <span className="text-[#a1a1b5] text-xs">{emotion}</span>
-              <span className="ml-auto font-bold text-[#f0f0f5] text-xs">{d.total || 0}</span>
+              <span className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: config.color, boxShadow: isActive ? `0 0 6px ${config.color}` : 'none' }} />
+              <span className="text-[#a1a1b5] text-xs truncate">{emotion}</span>
+              <span className="ml-auto font-bold text-[#f0f0f5] text-xs flex-shrink-0">{d.total || 0}</span>
             </div>
           );
         })}

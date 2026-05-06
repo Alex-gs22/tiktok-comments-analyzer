@@ -2,18 +2,20 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
+import {
+  LayoutDashboard,
   Sparkles,
   Video,
-  Hash, 
-  GitCompareArrows, 
-  Clock, 
+  Hash,
+  GitCompareArrows,
+  Clock,
   Flower2,
   Brain,
-  BarChart2
+  BarChart2,
+  Loader2
 } from 'lucide-react';
 import { useSidebarState } from './SidebarStateContext';
+import { useVideoAnalysis } from './VideoAnalysisContext';
 
 const navItems = [
   { name: 'Overview',           href: '/dashboard',    icon: LayoutDashboard },
@@ -29,6 +31,7 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { setIsHovered, isOpen } = useSidebarState();
+  const { isActive } = useVideoAnalysis();
 
   return (
     <aside
@@ -66,8 +69,10 @@ export default function Sidebar() {
       {/* Nav */}
       <nav className="flex flex-col gap-1 flex-1 px-3">
         {navItems.map((item) => {
-          const isActive = pathname.startsWith(item.href);
+          const isNavActive = pathname.startsWith(item.href);
           const Icon = item.icon;
+
+          const showVideoSpinner = item.href === '/video' && isActive && !pathname.startsWith('/video');
 
           return (
             <Link
@@ -76,18 +81,27 @@ export default function Sidebar() {
               className={`group relative flex items-center py-2.5 rounded-lg text-[14px] font-medium transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/40 ${
                 isOpen ? 'px-3' : 'justify-center px-0'
               } ${
-                isActive
+                isNavActive
                   ? 'bg-[rgba(255,255,255,0.06)] text-[#f0f0f5]'
                   : 'text-[#6b6b80] hover:text-[#a1a1b5] hover:bg-[rgba(255,255,255,0.03)]'
               }`}
             >
-              <Icon className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? 'text-accent-cyan' : 'text-[#4a4a5e] group-hover:text-[#6b6b80]'}`} />
-              
+              {showVideoSpinner ? (
+                <Loader2 className="w-5 h-5 flex-shrink-0 text-accent-cyan animate-spin" />
+              ) : (
+                <Icon className={`w-5 h-5 flex-shrink-0 transition-colors ${isNavActive ? 'text-accent-cyan' : 'text-[#4a4a5e] group-hover:text-[#6b6b80]'}`} />
+              )}
+
+              {/* Pulsing dot badge for video analysis in progress (both states) */}
+              {showVideoSpinner && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-accent-cyan animate-pulse" />
+              )}
+
               {/* Text + badge container — animates as one unit */}
-              <div 
+              <div
                 className="flex items-center gap-2 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
-                style={{ 
-                  width: isOpen ? '180px' : '0px', 
+                style={{
+                  width: isOpen ? '180px' : '0px',
                   opacity: isOpen ? 1 : 0,
                   marginLeft: isOpen ? '0.75rem' : '0',
                 }}
@@ -95,6 +109,9 @@ export default function Sidebar() {
                 <span className="whitespace-nowrap flex-1">{item.name}</span>
                 {item.badge && (
                   <span className="badge-live flex-shrink-0">{item.badge}</span>
+                )}
+                {showVideoSpinner && (
+                  <span className="w-2 h-2 rounded-full bg-accent-cyan animate-pulse flex-shrink-0" />
                 )}
               </div>
 
@@ -107,7 +124,7 @@ export default function Sidebar() {
               )}
 
               {/* Active indicator */}
-              {isActive && (
+              {isNavActive && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-accent-gradient" />
               )}
             </Link>

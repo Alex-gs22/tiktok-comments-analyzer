@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import GlassCard from '../GlassCard';
 import SectionHeader from '../SectionHeader';
 import { Gauge } from 'lucide-react';
@@ -13,10 +13,33 @@ import { SENTIMENT_COLORS } from '../../lib/emotionConfig';
  */
 export default function SentimentGauge({ data }) {
   const canvasRef = useRef(null);
+  const [animatedScore, setAnimatedScore] = useState(0);
 
   const positive = data.Positivo?.porcentaje || 0;
   const negative = data.Negativo?.porcentaje || 0;
   const neutral  = data.Neutro?.porcentaje || 0;
+  const targetScore = positive + (neutral / 2);
+
+  // Animate needle on mount/data change
+  useEffect(() => {
+    const startTime = Date.now();
+    const duration = 1500; // 1.5 seconds
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Easing: easeOutCubic for smooth deceleration
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      setAnimatedScore(targetScore * easeProgress);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }, [targetScore]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -60,8 +83,7 @@ export default function SentimentGauge({ data }) {
 
     // Needle — points to the sentiment "score"
     // Score: 0 = full negative, 50 = neutral, 100 = full positive
-    const score = positive + (neutral / 2);
-    const needleAngle = startAngle + (score / 100) * Math.PI;
+    const needleAngle = startAngle + (animatedScore / 100) * Math.PI;
     const needleLen = r - 30;
 
     ctx.beginPath();
@@ -80,7 +102,7 @@ export default function SentimentGauge({ data }) {
     ctx.arc(cx, cy, 5, 0, Math.PI * 2);
     ctx.fillStyle = '#f0f0f5';
     ctx.fill();
-  }, [positive, negative, neutral]);
+  }, [animatedScore, positive, negative, neutral]);
 
   return (
     <GlassCard>

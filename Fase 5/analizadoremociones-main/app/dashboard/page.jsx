@@ -37,7 +37,7 @@ export default function DashboardPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Auto-refresh when new data is inserted (e.g. from Live Analyzer)
+  // Refresh only when new data is inserted (insertPrediction / insertSession call notifyDataChange)
   useDataRefresh(loadData);
 
   if (loading || !kpis) {
@@ -77,10 +77,10 @@ export default function DashboardPage() {
 
       <div className="p-6 max-w-[1440px] mx-auto space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard title="Total Analizados" value={kpis.totalPredicciones} subtext="Comentarios procesados por el modelo" icon={MessageCircle} color="#06b6d4" delay={0} />
-          <KpiCard title="Emoción Dominante" value={kpis.emocionDominante} subtext="Emoción más frecuente" icon={Flame} color={EMOTIONS[kpis.emocionDominante]?.color || '#F87171'} animate={false} delay={0.1} />
-          <KpiCard title="% Inciertos" value={kpis.pctInciertos} suffix="%" subtext="Confianza < 40%" icon={AlertTriangle} color="#A1A1AA" decimals={1} delay={0.2} />
-          <KpiCard title="Videos" value={kpis.totalVideos} subtext="Videos de TikTok procesados" icon={Video} color="#8b5cf6" delay={0.3} />
+          <KpiCard title="Total Analizados" value={kpis.totalPredicciones} subtext="Comentarios procesados por el modelo" icon={MessageCircle} color="#06b6d4" delay={0} pulse={true} pulseColor="#00d9ff" />
+          <KpiCard title="Emoción Dominante" value={kpis.emocionDominante} subtext="Emoción más frecuente" icon={Flame} color={EMOTIONS[kpis.emocionDominante]?.color || '#F87171'} animate={false} delay={0.1} pulse={true} pulseColor="#FF4444" />
+          <KpiCard title="% Inciertos" value={kpis.pctInciertos} suffix="%" subtext="Confianza < 40%" icon={AlertTriangle} color="#A1A1AA" decimals={1} delay={0.2} pulse={true} pulseColor="#FFD700" />
+          <KpiCard title="Videos" value={kpis.totalVideos} subtext="Videos de TikTok procesados" icon={Video} color="#8b5cf6" delay={0.3} pulse={true} pulseColor="#FF00FF" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
