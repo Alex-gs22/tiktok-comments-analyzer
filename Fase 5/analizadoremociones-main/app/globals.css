@@ -359,3 +359,8 @@ body {
   flex-shrink: 0;
   transition: box-shadow 0.3s ease;
 }
+
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
